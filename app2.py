@@ -128,7 +128,7 @@ def user_dashboard():
 def edit_user(user_id):
     if current_user.role != 'admin':
         flash('Unauthorized access!', 'error')
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('dashboard'))
 
     user = User.query.get_or_404(user_id)
     
