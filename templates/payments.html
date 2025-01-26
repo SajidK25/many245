@@ -4,31 +4,85 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payments</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        .payments-container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+        .payments-container h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .payments-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .payments-table th, .payments-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .payments-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .payments-table tr:hover {
+            background-color: #f1f1f1;
+        }
+        .back-button {
+            display: block;
+            text-align: center;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .back-button:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <h1>Payment Records</h1>
-    <table border="1">
-        <thead>
-            <tr>
-                <th>Payment ID</th>
-                <th>User ID</th>
-                <th>Username</th>
-                <th>Amount</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for payment in payments %}
+    <div class="payments-container">
+        <h1>Payments</h1>
+        <table class="payments-table">
+            <thead>
                 <tr>
-                    <td>{{ payment.id }}</td>
-                    <td>{{ payment.user_id }}</td>
+                    <th>User</th>
+                    <th>Amount</th>
+                    <th>Payment Method</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr>
                     <td>{{ payment.user.username }}</td>
-                    <td>{{ payment.amount }}</td>
+                    <td>${{ "%.2f"|format(payment.amount) }}</td>
+                    <td>{{ payment.payment_method }}</td>
                     <td>{{ payment.date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{{ url_for('admin_dashboard') }}" class="back-button">Back to Dashboard</a>
+    </div>
 </body>
 </html>

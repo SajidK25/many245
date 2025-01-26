@@ -1,8 +1,104 @@
 <!DOCTYPE html>
-<html>
-<head><title>User Dashboard</title></head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        .dashboard-container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        .dashboard-container h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .user-info {
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .form-group button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .form-group button:hover {
+            background-color: #45a049;
+        }
+        .logout-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .logout-link:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
 <body>
-    <h1>Welcome, {{ current_user.username }}</h1>
-    <a href="{{ url_for('logout') }}">Logout</a>
+    <div class="dashboard-container">
+        <h1>Welcome, {{ current_user.username }}</h1>
+        <div class="user-info">
+            <p><strong>Role:</strong> {{ current_user.role }}</p>
+            <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
+            {% if current_user.payment_due_date %}
+                <p><strong>Next Payment Due:</strong> {{ current_user.payment_due_date.strftime('%Y-%m-%d') }}</p>
+                {% set days_remaining = (current_user.payment_due_date - now).days %}
+                <p><strong>Days Remaining:</strong> {% if days_remaining >= 0 %}{{ days_remaining }} days{% else %}Payment expired{% endif %}</p>
+            {% endif %}
+        </div>
+        <form method="post">
+            <div class="form-group">
+                <label for="amazon_relay_email">Amazon Relay Email</label>
+                <input type="email" id="amazon_relay_email" name="amazon_relay_email" value="{{ current_user.amazon_relay_email }}" placeholder="Enter your Amazon Relay email" required>
+            </div>
+            <div class="form-group">
+                <label for="amazon_relay_password">Amazon Relay Password</label>
+                <input type="password" id="amazon_relay_password" name="amazon_relay_password" placeholder="Enter your Amazon Relay password" required>
+            </div>
+            <div class="form-group">
+                <button type="submit">Save Credentials</button>
+            </div>
+        </form>
+        <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+    </div>
 </body>
 </html>
