@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete User</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        .delete-user-container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .delete-user-container h1 {
+            color: #d9534f;
+            margin-bottom: 20px;
+        }
+        .delete-user-container p {
+            margin-bottom: 20px;
+        }
+        .delete-user-container button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .delete-user-container .confirm-btn {
+            background-color: #d9534f;
+            color: white;
+            margin-right: 10px;
+        }
+        .delete-user-container .confirm-btn:hover {
+            background-color: #c9302c;
+        }
+        .delete-user-container .cancel-btn {
+            background-color: #5bc0de;
+            color: white;
+        }
+        .delete-user-container .cancel-btn:hover {
+            background-color: #31b0d5;
+        }
+    </style>
+</head>
+<body>
+    <div class="delete-user-container">
+        <h1>Delete User</h1>
+        <p>Are you sure you want to delete the user <strong>{{ user.username }}</strong>? This action cannot be undone.</p>
+        <form action="{{ url_for('delete_user', user_id=user.id) }}" method="post">
+            <button type="submit" class="confirm-btn">Yes, Delete</button>
+            <a href="{{ url_for('admin_dashboard') }}" class="cancel-btn">Cancel</a>
+        </form>
+    </div>
+</body>
+</html>

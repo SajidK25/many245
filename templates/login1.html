@@ -54,17 +54,21 @@
         .form-group button:hover {
             background-color: #45a049;
         }
-        .links {
+        .flash-messages {
+            margin-bottom: 10px;
             text-align: center;
-            margin-top: 10px;
         }
-        .links a {
-            color: #007BFF;
-            text-decoration: none;
-            margin: 0 5px;
+        .flash-messages div {
+            padding: 10px;
+            border-radius: 5px;
         }
-        .links a:hover {
-            text-decoration: underline;
+        .flash-messages .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .flash-messages .error {
+            background-color: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
@@ -92,11 +96,10 @@
             <div class="form-group">
                 <button type="submit">Login</button>
             </div>
+            <div class="forgot-password">
+                <a href="{{ url_for('register') }}">Don't have an account? Register here</a>
+            </div>
         </form>
-        <div class="links">
-            <a href="{{ url_for('register') }}">Register</a>
-            <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
-        </div>
     </div>
 </body>
 </html>
