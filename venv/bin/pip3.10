@@ -1,4 +1,4 @@
-#!/home/tech99/many245/venv/bin/python3
+#!/home/tech99/many245/venv/bin/python3.11
 # -*- coding: utf-8 -*-
 import re
 import sys

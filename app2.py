@@ -16,12 +16,13 @@ bcrypt = Bcrypt(app)
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False)
+    username = db.Column(db.String(20), unique=True, nullable=False, name="uq_user_username")  # Named unique constraint
+    email = db.Column(db.String(120), unique=True, nullable=False, name="uq_user_email")  # Named unique constraint
+    phone_number = db.Column(db.String(15), unique=True, nullable=True, name="uq_user_phone_number")  # Named unique constraint
     password = db.Column(db.String(60), nullable=False)
-    role = db.Column(db.String(10), nullable=False, default='user')  # 'admin' or 'user'
+    role = db.Column(db.String(10), nullable=False, default='user')
     is_paid = db.Column(db.Boolean, default=False)
-    payment_due_date = db.Column(db.Date, nullable=True)
-    amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True)
+    amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")  # Named unique constraint
     amazon_relay_password = db.Column(db.String(60), nullable=True)
 
     def set_password(self, password):
@@ -46,23 +47,29 @@ class Payment(db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    return render_template('forgot_password.html')
+@app.route('/update_smtp_settings', methods=['GET', 'POST'])
+def update_smtp_settings():
+    return render_template('update_smtp_settings.html')
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
+        email = request.form['email']
+        phone_number = request.form.get('phone_number')
         password = request.form['password']
         amazon_relay_email = request.form.get('amazon_relay_email')
         amazon_relay_password = request.form.get('amazon_relay_password')
 
-        # Check for duplicate username
-        existing_user = User.query.filter_by(username=username).first()
-        if existing_user:
-            flash('Username already exists. Please choose a different one.', 'error')
+        # Check for duplicate username or email
+        if User.query.filter((User.username == username) | (User.email == email)).first():
+            flash('Username or email already exists. Please choose a different one.', 'error')
             return redirect(url_for('register'))
 
         try:
-            user = User(username=username, amazon_relay_email=amazon_relay_email)
+            user = User(username=username, email=email, phone_number=phone_number, amazon_relay_email=amazon_relay_email)
             user.set_password(password)
             if amazon_relay_password:
                 user.set_amazon_relay_password(amazon_relay_password)
@@ -128,18 +135,22 @@ def user_dashboard():
 def edit_user(user_id):
     if current_user.role != 'admin':
         flash('Unauthorized access!', 'error')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('admin_dashboard'))
 
     user = User.query.get_or_404(user_id)
     
     if request.method == 'POST':
         username = request.form['username']
+        email = request.form['email']
+        phone_number = request.form.get('phone_number')
         password = request.form['password']
         role = request.form['role']
         amazon_relay_email = request.form.get('amazon_relay_email')
         amazon_relay_password = request.form.get('amazon_relay_password')
 
         user.username = username
+        user.email = email
+        user.phone_number = phone_number
         user.role = role
         user.amazon_relay_email = amazon_relay_email
         if password:
