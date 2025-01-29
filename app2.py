@@ -19,9 +19,12 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(20), unique=True, nullable=False, name="uq_user_username")  # Named unique constraint
     email = db.Column(db.String(120), unique=True, nullable=False, name="uq_user_email")  # Named unique constraint
     phone_number = db.Column(db.String(15), unique=True, nullable=True, name="uq_user_phone_number")  # Named unique constraint
+    notifications = db.Column(db.Boolean, default=False)
     password = db.Column(db.String(60), nullable=False)
     role = db.Column(db.String(10), nullable=False, default='user')
     is_paid = db.Column(db.Boolean, default=False)
+    payment_status = db.Column(db.String(20), default="Unpaid")
+    payment_due_date = db.Column(db.Date, nullable=True)
     amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")  # Named unique constraint
     amazon_relay_password = db.Column(db.String(60), nullable=True)
 
@@ -53,26 +56,26 @@ def forgot_password():
 @app.route('/update_smtp_settings', methods=['GET', 'POST'])
 def update_smtp_settings():
     return render_template('update_smtp_settings.html')
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
-        email = request.form['email']
-        phone_number = request.form.get('phone_number')
         password = request.form['password']
-        amazon_relay_email = request.form.get('amazon_relay_email')
-        amazon_relay_password = request.form.get('amazon_relay_password')
-
+        email = request.form['email']
+        phone_number = request.form['phone_number']
+        notifications = 'notifications' in request.form  # Checkbox returns 'on' if checked
+        
         # Check for duplicate username or email
-        if User.query.filter((User.username == username) | (User.email == email)).first():
-            flash('Username or email already exists. Please choose a different one.', 'error')
-            return redirect(url_for('register'))
+        existing_user = User.query.filter((User.username == username) | (User.email == email) | (User.phone_number == phone_number)).first()
 
+        if existing_user:
+            flash('Username or email or phone number already exists. Please choose a different one.', 'error')
+            return redirect(url_for('register'))
+        
         try:
-            user = User(username=username, email=email, phone_number=phone_number, amazon_relay_email=amazon_relay_email)
+            user = User(username=username, email=email, phone_number=phone_number, notifications=notifications)
             user.set_password(password)
-            if amazon_relay_password:
-                user.set_amazon_relay_password(amazon_relay_password)
             db.session.add(user)
             db.session.commit()
             flash('Registration successful. Please log in.', 'success')
@@ -83,6 +86,25 @@ def register():
             return redirect(url_for('register'))
 
     return render_template('register.html')
+
+from datetime import datetime, timedelta
+
+def update_payment_status():
+    users = User.query.all()
+    today = datetime.utcnow().date()
+
+    for user in users:
+        if user.payment_due_date:
+            days_remaining = (user.payment_due_date - today).days
+            if days_remaining < 0:
+                user.payment_status = "Expired"
+                user.is_paid = False
+            elif days_remaining >= 0 and user.is_paid:
+                user.payment_status = "Paid"
+            else:
+                user.payment_status = "Unpaid"
+        db.session.commit()
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -117,7 +139,8 @@ def admin_dashboard():
         flash('Unauthorized access!', 'error')
         return redirect(url_for('login'))
     users = User.query.all()
-    return render_template('admin_dashboard.html', users=users)
+    now = datetime.utcnow().date()
+    return render_template('admin_dashboard.html', users=users,now=now)
 
 @app.route('/user_dashboard')
 @login_required
@@ -128,7 +151,8 @@ def user_dashboard():
     if not current_user.is_paid:
         flash('Access restricted. Please contact the admin to make a payment.', 'error')
         return redirect(url_for('login'))
-    return render_template('user_dashboard.html')
+    now = datetime.utcnow().date()
+    return render_template('user_dashboard.html',now=now)
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -219,6 +243,23 @@ def view_payments():
 
     payments = Payment.query.order_by(Payment.date.desc()).all()
     return render_template('payments.html', payments=payments)
+
+@app.route('/update_amazon_relay', methods=['POST'])
+@login_required
+def update_amazon_relay():
+    amazon_relay_email = request.form.get('amazon_relay_email')
+    amazon_relay_password = request.form.get('amazon_relay_password')
+    
+    if amazon_relay_email and amazon_relay_password:
+        current_user.amazon_relay_email = amazon_relay_email
+        current_user.set_amazon_relay_password(amazon_relay_password)  # Encrypt password
+        db.session.commit()
+        flash('Amazon Relay credentials updated successfully.', 'success')
+    else:
+        flash('Both fields are required.', 'error')
+    
+    return redirect(url_for('user_dashboard'))
+
 
 @app.cli.command('initdb')
 def initdb():

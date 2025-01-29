@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>User Dashboard</title>
     <style>
         body {
@@ -76,8 +77,27 @@
 <body>
     <div class="dashboard-container">
         <h1>Welcome, {{ current_user.username }}</h1>
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        {% if category == 'error' %}
+                            {% set category = 'danger' %}
+                        {% elif category == 'message' %}
+                            {% set category = 'info' %}
+                        {% endif %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
         <div class="user-info">
             <p><strong>Role:</strong> {{ current_user.role }}</p>
+            <p><strong>Email:</strong> {{ current_user.email }}</p>
+            <p><strong>Phone Number:</strong> {{ current_user.phone_number }}</p>
+            <p><strong>Notifications:</strong> {% if current_user.notifications %}Enabled{% else %}Disabled{% endif %}</p>
             <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
             {% if current_user.payment_due_date %}
                 <p><strong>Next Payment Due:</strong> {{ current_user.payment_due_date.strftime('%Y-%m-%d') }}</p>
@@ -85,7 +105,7 @@
                 <p><strong>Days Remaining:</strong> {% if days_remaining >= 0 %}{{ days_remaining }} days{% else %}Payment expired{% endif %}</p>
             {% endif %}
         </div>
-        <form method="post">
+        <form action="{{ url_for('update_amazon_relay') }}" method="post">
             <div class="form-group">
                 <label for="amazon_relay_email">Amazon Relay Email</label>
                 <input type="email" id="amazon_relay_email" name="amazon_relay_email" value="{{ current_user.amazon_relay_email }}" placeholder="Enter your Amazon Relay email" required>
@@ -95,7 +115,7 @@
                 <input type="password" id="amazon_relay_password" name="amazon_relay_password" placeholder="Enter your Amazon Relay password" required>
             </div>
             <div class="form-group">
-                <button type="submit">Save Credentials</button>
+                <button type="submit">Save Amazon Relay Credentials</button>
             </div>
         </form>
         <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
