@@ -5,6 +5,7 @@ from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
 import os
+import stripe
 
 app = Flask(__name__)
 # Use PostgreSQL in production, SQLite for local development
@@ -13,6 +14,23 @@ app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['SECRET_KEY'] = 'sample_secret_key_123456'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+# SMTP Server Config
+app.config['MAIL_SERVER'] = 'smtp.example.com'  # Replace with your SMTP server
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'your_email@example.com'  # Your SMTP username
+app.config['MAIL_PASSWORD'] = 'your_email_password'  # Your SMTP password
+app.config['MAIL_DEFAULT_SENDER'] = 'your_email@example.com'
+
+# VoIP.ms Config
+app.config['VOIPMS_API_URL'] = 'https://voip.ms/api/v1/rest.php'
+app.config['VOIPMS_API_USERNAME'] = 'your_voipms_username'
+app.config['VOIPMS_API_PASSWORD'] = 'your_voipms_password'
+
+# Stripe Config
+app.config["STRIPE_SECRET_KEY"] = "your_secret_key"
+app.config["STRIPE_PUBLIC_KEY"] = "your_public_key"
+
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 login_manager = LoginManager(app)
@@ -30,9 +48,11 @@ class User(db.Model, UserMixin):
     is_paid = db.Column(db.Boolean, default=False)
     payment_status = db.Column(db.String(20), default="Unpaid")
     payment_due_date = db.Column(db.Date, nullable=True)
+    stripe_enabled = db.Column(db.Boolean, default=False)
     amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")  # Named unique constraint
     amazon_relay_password = db.Column(db.String(60), nullable=True)
-
+    sms_opt_in = db.Column(db.Boolean, default=False)  # Track if SMS alerts are enabled
+    sms_fee_due = db.Column(db.Float, default=0.0)  # Track the prorated amount
     def set_password(self, password):
         self.password = bcrypt.generate_password_hash(password).decode('utf-8')
 
@@ -51,6 +71,26 @@ class Payment(db.Model):
     amount = db.Column(db.Float, nullable=False, default=30.0)
     date = db.Column(db.DateTime, default=datetime.utcnow)
     payment_method = db.Column(db.String(20), nullable=False)  # 'cash', 'check', 'credit_card'
+
+class Config(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key_name = db.Column(db.String(50), unique=True, nullable=False)
+    key_value = db.Column(db.String(255), nullable=False)
+
+def get_config_value(key_name):
+    config = Config.query.filter_by(key_name=key_name).first()
+    return config.key_value if config else None
+
+def set_config_value(key_name, key_value):
+    config = Config.query.filter_by(key_name=key_name).first()
+    if config:
+        config.key_value = key_value
+    else:
+        config = Config(key_name=key_name, key_value=key_value)
+        db.session.add(config)
+    db.session.commit()
+
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -248,6 +288,152 @@ def view_payments():
 
     payments = Payment.query.order_by(Payment.date.desc()).all()
     return render_template('payments.html', payments=payments)
+
+@app.route("/admin/process_payment/<int:user_id>", methods=["POST"])
+@login_required
+def process_payment(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    user = User.query.get_or_404(user_id)
+    amount = float(request.form["amount"]) * 100  # Convert dollars to cents
+
+    try:
+        charge = stripe.Charge.create(
+            amount=int(amount),
+            currency="usd",
+            description=f"Payment for {user.username}",
+            source=request.form["stripeToken"],
+        )
+        user.is_paid = True
+        user.payment_due_date = datetime.utcnow().date() + timedelta(days=30)
+        db.session.commit()
+        flash("Payment processed successfully!", "success")
+    except stripe.error.StripeError as e:
+        flash(f"Payment failed: {e.user_message}", "error")
+
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/update_stripe_keys", methods=["GET", "POST"])
+@login_required
+def update_stripe_keys():
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    if request.method == "POST":
+        stripe_public_key = request.form["stripe_public_key"]
+        stripe_secret_key = request.form["stripe_secret_key"]
+
+        set_config_value("STRIPE_PUBLIC_KEY", stripe_public_key)
+        set_config_value("STRIPE_SECRET_KEY", stripe_secret_key)
+
+        flash("Stripe API keys updated successfully!", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    return render_template("update_stripe_keys.html",
+                           stripe_public_key=get_config_value("STRIPE_PUBLIC_KEY"),
+                           stripe_secret_key=get_config_value("STRIPE_SECRET_KEY"))
+
+
+@app.route("/user/payment", methods=["GET", "POST"])
+@login_required
+def user_payment():
+    if not current_user.stripe_enabled:
+        flash("Stripe payments are not enabled for your account.", "error")
+        return redirect(url_for("user_dashboard"))
+
+    if request.method == "POST":
+        amount = float(request.form["amount"]) * 100  # Convert to cents
+
+        try:
+            charge = stripe.Charge.create(
+                amount=int(amount),
+                currency="usd",
+                description=f"Payment for {current_user.username}",
+                source=request.form["stripeToken"],
+            )
+            current_user.is_paid = True
+            current_user.payment_due_date = datetime.utcnow().date() + timedelta(days=30)
+            db.session.commit()
+            flash("Payment successful!", "success")
+            return redirect(url_for("user_dashboard"))
+        except stripe.error.StripeError as e:
+            flash(f"Payment failed: {e.user_message}", "error")
+
+    return render_template("user_payment.html", stripe_public_key=app.config["STRIPE_PUBLIC_KEY"])
+
+@app.route("/admin/toggle_stripe/<int:user_id>", methods=["POST"])
+@login_required
+def toggle_stripe(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    user = User.query.get_or_404(user_id)
+    user.stripe_enabled = not user.stripe_enabled
+    db.session.commit()
+
+    flash(f"Stripe payments {'enabled' if user.stripe_enabled else 'disabled'} for {user.username}.", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/toggle_sms_opt_in/<int:user_id>", methods=["POST"])
+@login_required
+def toggle_sms_opt_in(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    user = User.query.get_or_404(user_id)
+    
+    today = datetime.utcnow().date()
+    days_in_month = 30  # Assuming a 30-day month for simplicity
+    days_remaining = max((user.payment_due_date - today).days, 0)
+
+    if not user.sms_opt_in:
+        # Calculate prorated fee
+        prorated_fee = round((days_remaining / days_in_month) * 10, 2) if days_remaining > 0 else 10.00
+        user.sms_fee_due = prorated_fee
+        user.sms_opt_in = True
+        flash(f"SMS alerts enabled. Prorated fee: ${prorated_fee}. Please proceed to payment.", "success")
+    else:
+        user.sms_opt_in = False
+        user.sms_fee_due = 0.0
+        flash("SMS alerts disabled.", "success")
+
+    db.session.commit()
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/payment", methods=["GET", "POST"])
+@login_required
+def payment():
+    base_amount = 30.00  # Base monthly fee
+    sms_fee = current_user.sms_fee_due if current_user.sms_opt_in else 0.00
+    total_amount = base_amount + sms_fee
+
+    if request.method == "POST":
+        amount_in_cents = int(total_amount * 100)  # Convert to cents for Stripe
+
+        try:
+            charge = stripe.Charge.create(
+                amount=amount_in_cents,
+                currency="usd",
+                description=f"Payment for {current_user.username}",
+                source=request.form["stripeToken"],
+            )
+            current_user.is_paid = True
+            current_user.payment_due_date = datetime.utcnow().date() + timedelta(days=30)
+            current_user.sms_fee_due = 0.0  # Reset SMS fee after payment
+            db.session.commit()
+
+            flash("Payment successful!", "success")
+            return redirect(url_for("user_dashboard"))
+        except stripe.error.StripeError as e:
+            flash(f"Payment failed: {e.user_message}", "error")
+
+    return render_template("payment.html", total_amount=total_amount, stripe_public_key=get_config_value("STRIPE_PUBLIC_KEY"))
+
 
 @app.route('/update_amazon_relay', methods=['POST'])
 @login_required

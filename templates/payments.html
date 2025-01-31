@@ -99,6 +99,21 @@
                 {% endfor %}
             </tbody>
         </table>
+        <form action="{{ url_for('process_payment') }}" method="post">
+            <div class="form-group">
+                <label>Total Amount Due</label>
+                <p><strong>${{ total_amount }}</strong></p>
+            </div>
+            <div class="form-group">
+                <script src="https://checkout.stripe.com/checkout.js" class="stripe-button"
+                    data-key="{{ stripe_public_key }}"
+                    data-description="Payment for {{ current_user.username }}"
+                    data-amount="{{ (total_amount * 100)|int }}"
+                    data-currency="usd">
+                </script>
+            </div>
+        </form>
+
         <a href="{{ url_for('admin_dashboard') }}" class="back-button">Back to Dashboard</a>
     </div>
 </body>

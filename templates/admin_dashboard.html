@@ -129,6 +129,7 @@
                     <th>Payment Status</th>
                     <th>Next Payment Due</th>
                     <th>Actions</th>
+                    <th>Stripe</th>
                 </tr>
             </thead>
             <tbody>
@@ -142,12 +143,27 @@
                         <a href="{{ url_for('edit_user', user_id=user.id) }}">Edit</a>
                         <a href="{{ url_for('mark_paid', user_id=user.id) }}">Mark Paid</a>
                     </td>
+                    <td>
+                    <form action="{{ url_for('toggle_stripe', user_id=user.id) }}" method="post">
+                        <button type="submit">
+                            {% if user.stripe_enabled %}Disable Stripe{% else %}Enable Stripe{% endif %}
+                        </button>
+                    </form>
+
+                    </td>
+                    <td>
+                        <form action="{{ url_for('toggle_sms_opt_in', user_id=user.id) }}" method="post">
+                            <button type="submit">
+                                {% if user.sms_opt_in %}Disable SMS{% else %}Enable SMS ($10.00){% endif %}
+                            </button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
-
+        <a href="{{ url_for('update_stripe_keys') }}" class="back-link">Update Stripe API Keys</a>
         <a href="{{ url_for('logout') }}">Logout</a>
     </div>
 </body>
