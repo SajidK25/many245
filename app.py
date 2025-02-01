@@ -6,8 +6,13 @@ from flask_migrate import Migrate
 from datetime import datetime, timedelta
 import os
 import stripe
+from flask_mail import Mail, Message
+import uuid
+import requests
+import random
 
 app = Flask(__name__)
+mail = Mail(app)
 # Use PostgreSQL in production, SQLite for local development
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
@@ -49,6 +54,8 @@ class User(db.Model, UserMixin):
     payment_status = db.Column(db.String(20), default="Unpaid")
     payment_due_date = db.Column(db.Date, nullable=True)
     stripe_enabled = db.Column(db.Boolean, default=False)
+    email_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100), nullable=True)
     amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")  # Named unique constraint
     amazon_relay_password = db.Column(db.String(60), nullable=True)
     sms_opt_in = db.Column(db.Boolean, default=False)  # Track if SMS alerts are enabled
@@ -90,14 +97,32 @@ def set_config_value(key_name, key_value):
         db.session.add(config)
     db.session.commit()
 
+def send_sms(phone_number, message):
+    payload = {
+        'api_username': app.config['VOIPMS_API_USERNAME'],
+        'api_password': app.config['VOIPMS_API_PASSWORD'],
+        'did': 'Your_VoIP_DID_Number',  # Replace with your DID number
+        'dst': phone_number,
+        'message': message
+    }
+    response = requests.post(app.config['VOIPMS_API_URL'], data=payload)
+    return response.json()
+
+def notify_user(user, message):
+    if user.notifications:
+        if user.phone_number:
+            send_sms(user.phone_number, message)
+        if user.email:
+            msg = Message('Notification', recipients=[user.email], body=message)
+            mail.send(msg)
 
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    return render_template('forgot_password.html')
+# @app.route('/forgot_password', methods=['GET', 'POST'])
+# def forgot_password():
+#     return render_template('forgot_password.html')
 @app.route('/update_smtp_settings', methods=['GET', 'POST'])
 def update_smtp_settings():
     return render_template('update_smtp_settings.html')
@@ -132,7 +157,105 @@ def register():
 
     return render_template('register.html')
 
-from datetime import datetime, timedelta
+@app.route('/send_verification_email', methods=['POST'])
+@login_required
+def send_verification_email():
+    token = str(uuid.uuid4())
+    current_user.verification_token = token
+    db.session.commit()
+
+    verification_link = url_for('verify_email', token=token, _external=True)
+    message = Message(
+        'Email Verification',
+        recipients=[current_user.email],
+        body=f'Click the link to verify your email: {verification_link}'
+    )
+    mail.send(message)
+
+    flash('Verification email sent. Please check your inbox.', 'success')
+    return redirect(url_for('user_dashboard'))
+
+@app.route('/verify_email/<token>')
+def verify_email(token):
+    user = User.query.filter_by(verification_token=token).first()
+    if user:
+        user.email_verified = True
+        user.verification_token = None
+        db.session.commit()
+        flash('Email successfully verified!', 'success')
+    else:
+        flash('Invalid or expired token.', 'error')
+    return redirect(url_for('login'))
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form['email']
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token = str(uuid.uuid4())
+            user.verification_token = token
+            db.session.commit()
+
+            reset_link = url_for('reset_password', token=token, _external=True)
+            message = Message(
+                'Password Reset Request',
+                recipients=[email],
+                body=f'Click the link to reset your password: {reset_link}'
+            )
+            mail.send(message)
+
+            flash('Password reset email sent. Please check your inbox.', 'success')
+        else:
+            flash('No account found with that email.', 'error')
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    user = User.query.filter_by(verification_token=token).first()
+    if not user:
+        flash('Invalid or expired token.', 'error')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        new_password = request.form['password']
+        user.set_password(new_password)
+        user.verification_token = None
+        db.session.commit()
+        flash('Password updated successfully.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('reset_password.html', token=token)
+
+@app.route('/send_otp', methods=['POST'])
+@login_required
+def send_otp():
+    otp = random.randint(100000, 999999)
+    current_user.verification_token = str(otp)
+    db.session.commit()
+
+    message = f'Your OTP is: {otp}'
+    response = send_sms(current_user.phone_number, message)
+
+    if response.get('status') == 'success':
+        flash('OTP sent to your phone.', 'success')
+    else:
+        flash('Failed to send OTP. Please try again.', 'error')
+
+    return redirect(url_for('user_dashboard'))
+
+@app.route('/verify_otp', methods=['POST'])
+@login_required
+def verify_otp():
+    otp = request.form['otp']
+    if current_user.verification_token == otp:
+        current_user.verification_token = None
+        db.session.commit()
+        flash('Phone number successfully verified!', 'success')
+    else:
+        flash('Invalid OTP.', 'error')
+
+    return redirect(url_for('user_dashboard'))
 
 def update_payment_status():
     users = User.query.all()
@@ -149,6 +272,7 @@ def update_payment_status():
             else:
                 user.payment_status = "Unpaid"
         db.session.commit()
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
