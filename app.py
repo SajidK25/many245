@@ -116,6 +116,17 @@ def notify_user(user, message):
             msg = Message('Notification', recipients=[user.email], body=message)
             mail.send(msg)
 
+def set_default_monthly_fee():
+    if not Config.query.filter_by(key_name="MONTHLY_FEE").first():
+        set_config_value("MONTHLY_FEE", "30.00")
+
+def get_monthly_fee():
+    fee = Config.query.filter_by(key_name="MONTHLY_FEE").first()
+    return float(fee.key_value) if fee else 30.00  # Default value
+
+def set_monthly_fee(new_fee):
+    set_config_value("MONTHLY_FEE", str(new_fee))
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -309,7 +320,7 @@ def admin_dashboard():
         return redirect(url_for('login'))
     users = User.query.all()
     now = datetime.utcnow().date()
-    return render_template('admin_dashboard.html', users=users,now=now)
+    return render_template('admin_dashboard.html', users=users,now=now,monthly_fee=get_monthly_fee())
 
 @app.route('/user_dashboard')
 @login_required
@@ -531,13 +542,13 @@ def toggle_sms_opt_in(user_id):
 
 @app.route("/payment", methods=["GET", "POST"])
 @login_required
-def payment():
-    base_amount = 30.00  # Base monthly fee
+def process_payment():
+    base_amount = get_monthly_fee()  # Use the dynamic fee
     sms_fee = current_user.sms_fee_due if current_user.sms_opt_in else 0.00
     total_amount = base_amount + sms_fee
 
     if request.method == "POST":
-        amount_in_cents = int(total_amount * 100)  # Convert to cents for Stripe
+        amount_in_cents = int(total_amount * 100)
 
         try:
             charge = stripe.Charge.create(
@@ -548,7 +559,7 @@ def payment():
             )
             current_user.is_paid = True
             current_user.payment_due_date = datetime.utcnow().date() + timedelta(days=30)
-            current_user.sms_fee_due = 0.0  # Reset SMS fee after payment
+            current_user.sms_fee_due = 0.0
             db.session.commit()
 
             flash("Payment successful!", "success")
@@ -557,6 +568,22 @@ def payment():
             flash(f"Payment failed: {e.user_message}", "error")
 
     return render_template("payment.html", total_amount=total_amount, stripe_public_key=get_config_value("STRIPE_PUBLIC_KEY"))
+
+@app.route("/admin/update_monthly_fee", methods=["POST"])
+@login_required
+def update_monthly_fee():
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    new_fee = request.form["monthly_fee"]
+    try:
+        set_monthly_fee(float(new_fee))
+        flash("Monthly fee updated successfully!", "success")
+    except ValueError:
+        flash("Invalid amount. Please enter a valid number.", "error")
+
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.route('/update_amazon_relay', methods=['POST'])
