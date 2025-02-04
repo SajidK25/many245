@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash,session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
@@ -12,6 +12,7 @@ import requests
 import random
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'
 mail = Mail(app)
 # Use PostgreSQL in production, SQLite for local development
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
@@ -49,6 +50,8 @@ class User(db.Model, UserMixin):
     phone_number = db.Column(db.String(15), unique=True, nullable=True, name="uq_user_phone_number")  # Named unique constraint
     notifications = db.Column(db.Boolean, default=False)
     password = db.Column(db.String(60), nullable=False)
+    max_logins = db.Column(db.Integer, default=1)  # Default to 1 active login
+    active_tokens = db.relationship('LoginToken', backref='user', lazy=True)
     role = db.Column(db.String(10), nullable=False, default='user')
     is_paid = db.Column(db.Boolean, default=False)
     payment_status = db.Column(db.String(20), default="Unpaid")
@@ -72,6 +75,12 @@ class User(db.Model, UserMixin):
     def check_amazon_relay_password(self, password):
         return bcrypt.check_password_hash(self.amazon_relay_password, password)
 
+class LoginToken(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -83,6 +92,19 @@ class Config(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key_name = db.Column(db.String(50), unique=True, nullable=False)
     key_value = db.Column(db.String(255), nullable=False)
+
+@app.before_request
+def clean_expired_sessions():
+    session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
+    expiry_time = datetime.utcnow() - session_lifetime
+    LoginToken.query.filter(LoginToken.created_at < expiry_time).delete()
+    db.session.commit()
+
+def get_extra_login_price():
+    return float(get_config_value("EXTRA_LOGIN_PRICE") or 5.00)  # Default to $5
+
+def set_extra_login_price(price):
+    set_config_value("EXTRA_LOGIN_PRICE", str(price))
 
 def get_config_value(key_name):
     config = Config.query.filter_by(key_name=key_name).first()
@@ -292,25 +314,83 @@ def login():
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
-            login_user(user)
-            flash('Login successful!', 'success')
 
-            # Redirect based on user role
-            if user.role == 'admin':
+        if user and user.check_password(password):
+            # Admins have unlimited logins
+            if user.role == "admin":
+                login_user(user)
+                flash("Admin login successful!", "success")
                 return redirect(url_for('admin_dashboard'))
+
+            # Regular users must adhere to the login limit
+            active_sessions = LoginToken.query.filter_by(user_id=user.id).count()
+            if (active_sessions or 0) >= (user.max_logins or 1):
+                flash("Maximum login limit reached. Upgrade to allow more sessions.", "error")
+                return redirect(url_for('login'))
+
+            # Generate new login token
+            new_token = str(uuid.uuid4())
+            session['login_token'] = new_token  # Store token in session
+            login_token = LoginToken(user_id=user.id, token=new_token)
+            db.session.add(login_token)
+            db.session.commit()
+
+            login_user(user)
             return redirect(url_for('user_dashboard'))
-        
+
         flash('Invalid username or password.', 'error')
     return render_template('login.html')
+
+@app.route("/admin/update_login_price", methods=["POST"])
+@login_required
+def update_login_price():
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    new_price = request.form["extra_login_price"]
+    try:
+        set_extra_login_price(float(new_price))
+        flash("Extra login price updated successfully!", "success")
+    except ValueError:
+        flash("Invalid price entered.", "error")
+
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/purchase_extra_login", methods=["POST"])
+@login_required
+def purchase_extra_login():
+    extra_price = get_extra_login_price()
+
+    try:
+        charge = stripe.Charge.create(
+            amount=int(extra_price * 100),
+            currency="usd",
+            description=f"Extra login for {current_user.username}",
+            source=request.form["stripeToken"],
+        )
+        current_user.max_logins += 1  # Increase allowed logins
+        db.session.commit()
+        flash("Extra login purchased successfully!", "success")
+    except stripe.error.StripeError as e:
+        flash(f"Payment failed: {e.user_message}", "error")
+
+    return redirect(url_for("user_dashboard"))
 
 @app.route('/logout')
 @login_required
 def logout():
+    if current_user.role != "admin":
+        token = session.get('login_token')
+        if token:
+            db.LoginToken.query.filter_by(token=token).delete()
+            db.session.commit()
+            session.pop('login_token', None)
+        session.clear()
     logout_user()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
+
 
 @app.route('/admin_dashboard')
 @login_required
@@ -542,7 +622,7 @@ def toggle_sms_opt_in(user_id):
 
 @app.route("/payment", methods=["GET", "POST"])
 @login_required
-def process_payment():
+def payment():
     base_amount = get_monthly_fee()  # Use the dynamic fee
     sms_fee = current_user.sms_fee_due if current_user.sms_opt_in else 0.00
     total_amount = base_amount + sms_fee

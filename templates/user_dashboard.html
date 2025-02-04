@@ -118,6 +118,10 @@
                 <button type="submit">Save Amazon Relay Credentials</button>
             </div>
         </form>
+        <form action="{{ url_for('purchase_extra_login') }}" method="post">
+            <button type="submit">Buy Extra Login (${{ extra_login_price }})</button>
+        </form>
+
         <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
     </div>
 </body>
