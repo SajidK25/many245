@@ -54,6 +54,7 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(60), nullable=False)
     max_logins = db.Column(db.Integer, default=1)  # Default to 1 active login
     active_tokens = db.relationship('LoginToken', backref='user', lazy=True)
+    active_sessions = db.relationship('LoginSession', backref='user', lazy=True)
     role = db.Column(db.String(10), nullable=False, default='user')
     is_paid = db.Column(db.Boolean, default=False)
     payment_status = db.Column(db.String(20), default="Unpaid")
@@ -82,6 +83,12 @@ class LoginToken(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     token = db.Column(db.String(255), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+class LoginSession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    session_token = db.Column(db.String(255), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -102,12 +109,22 @@ class VoipSettings(db.Model):
     sms_enabled = db.Column(db.Boolean, default=False)
     sms_fee = db.Column(db.Float, default=0.0)
 
-@app.before_request
-def clean_expired_sessions():
-    session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
-    expiry_time = datetime.utcnow() - session_lifetime
-    LoginToken.query.filter(LoginToken.created_at < expiry_time).delete()
-    db.session.commit()
+# @app.before_request
+# def clean_expired_sessions():
+#     session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
+#     expiry_time = datetime.utcnow() - session_lifetime
+#     LoginToken.query.filter(LoginToken.created_at < expiry_time).delete()
+#     db.session.commit()
+
+# @app.before_request
+# def validate_active_session():
+#     if current_user.is_authenticated and current_user.role != "admin":
+#         token = session.get('login_token')
+#         if not token or not LoginSession.query.filter_by(session_token=token).first():
+#             logout_user()
+#             session.pop('login_token', None)
+#             flash("Session expired. Please log in again.", "error")
+#             return redirect(url_for('login'))
 
 def get_extra_login_price():
     return float(get_config_value("EXTRA_LOGIN_PRICE") or 5.00)  # Default to $5
@@ -348,40 +365,41 @@ def update_payment_status():
                 user.payment_status = "Unpaid"
         db.session.commit()
 
-
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'GET':
+        return render_template('login.html')  # Handle GET request properly
+
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
+
         user = User.query.filter_by(username=username).first()
+        if not user or not user.check_password(password):
+            flash("Invalid username or password.", "error")
+            return redirect(url_for('login'))
 
-        if user and user.check_password(password):
-            # Admins have unlimited logins
-            if user.role == "admin":
-                login_user(user)
-                flash("Admin login successful!", "success")
-                return redirect(url_for('admin_dashboard'))
-
-            # Regular users must adhere to the login limit
-            active_sessions = LoginToken.query.filter_by(user_id=user.id).count()
-            if (active_sessions or 0) >= (user.max_logins or 1):
-                flash("Maximum login limit reached. Upgrade to allow more sessions.", "error")
-                return redirect(url_for('login'))
-
-            # Generate new login token
-            new_token = str(uuid.uuid4())
-            session['login_token'] = new_token  # Store token in session
-            login_token = LoginToken(user_id=user.id, token=new_token)
-            db.session.add(login_token)
-            db.session.commit()
-
+        # Admins have unlimited logins
+        if user.role == "admin":
             login_user(user)
-            return redirect(url_for('user_dashboard'))
+            flash("Admin login successful!", "success")
+            return redirect(url_for('admin_dashboard'))
 
-        flash('Invalid username or password.', 'error')
-    return render_template('login.html')
+        # Check active session count
+        active_sessions = LoginSession.query.filter_by(user_id=user.id).count()
+        if (active_sessions or 0) >= (user.max_logins or 1):
+            flash("Maximum login limit reached. Upgrade to allow more sessions.", "error")
+            return redirect(url_for('login'))
+
+        # Generate a new session token
+        new_token = str(uuid.uuid4())
+        login_session = LoginSession(user_id=user.id, session_token=new_token)
+        db.session.add(login_session)
+        db.session.commit()
+
+        session['login_token'] = new_token
+        login_user(user)
+        return redirect(url_for('user_dashboard'))
 
 @app.route("/admin/update_login_price", methods=["POST"])
 @login_required
@@ -399,39 +417,74 @@ def update_login_price():
 
     return redirect(url_for("admin_dashboard"))
 
-@app.route("/purchase_extra_login", methods=["POST"])
+@app.route("/purchase_extra_login", methods=["GET", "POST"])
 @login_required
 def purchase_extra_login():
-    extra_price = get_extra_login_price()
+    if request.method == 'POST':
+        try:
+            extra_login_price = get_extra_login_price()
 
-    try:
-        charge = stripe.Charge.create(
-            amount=int(extra_price * 100),
-            currency="usd",
-            description=f"Extra login for {current_user.username}",
-            source=request.form["stripeToken"],
-        )
-        current_user.max_logins += 1  # Increase allowed logins
-        db.session.commit()
-        flash("Extra login purchased successfully!", "success")
-    except stripe.error.StripeError as e:
-        flash(f"Payment failed: {e.user_message}", "error")
+            # Create a Stripe checkout session
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': 'Extra Login Slot',
+                        },
+                        'unit_amount': int(extra_login_price * 100),  # Convert to cents
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=url_for('payment_success', _external=True),
+                cancel_url=url_for('purchase_extra_login', _external=True),
+            )
+            return redirect(session.url, code=303)
+        except Exception as e:
+            flash(f"Error processing payment: {str(e)}", "error")
+            return redirect(url_for('purchase_extra_login'))
 
-    return redirect(url_for("user_dashboard"))
+    return render_template('purchase_extra_login.html')
+
+@app.route('/payment_success')
+@login_required
+def payment_success():
+    # Add an extra login slot for the user
+    current_user.max_logins += 1
+    db.session.commit()
+
+    flash("Payment successful! Extra login slot added.", "success")
+    return redirect(url_for('user_dashboard'))
+
+
+@app.route('/admin/reset_sessions/<int:user_id>', methods=['POST'])
+@login_required
+def reset_user_sessions(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    LoginSession.query.filter_by(user_id=user_id).delete()
+    db.session.commit()
+    
+    flash("All sessions for the user have been reset.", "success")
+    return redirect(url_for("admin_dashboard"))
 
 @app.route('/logout')
 @login_required
 def logout():
     if current_user.role != "admin":
-        token = session.get('login_token')
-        if token:
-            db.LoginToken.query.filter_by(token=token).delete()
-            db.session.commit()
-            session.pop('login_token', None)
-        session.clear()
+        # Delete all active sessions for the user
+        LoginSession.query.filter_by(user_id=current_user.id).delete()
+        db.session.commit()
+
+    session.pop('login_token', None)
     logout_user()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
+
 
 
 @app.route('/admin_dashboard')

@@ -130,6 +130,7 @@
                     <th>Next Payment Due</th>
                     <th>Stripe</th>
                     <th>SMS</th>
+                    <th>Sessions Reset</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -153,6 +154,11 @@
                                 {% if user.sms_opt_in %}Disable SMS{% else %}Enable SMS ($10.00){% endif %}
                             </button>
                         </form>
+                    </td>
+                    <td>
+                    <form action="{{ url_for('reset_user_sessions', user_id=user.id) }}" method="post">
+                        <button type="submit">Reset Sessions</button>
+                    </form>
                     </td>
                     <td class="action-buttons">
                         <a href="{{ url_for('edit_user', user_id=user.id) }}">Edit</a>
