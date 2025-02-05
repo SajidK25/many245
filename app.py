@@ -109,6 +109,14 @@ class VoipSettings(db.Model):
     sms_enabled = db.Column(db.Boolean, default=False)
     sms_fee = db.Column(db.Float, default=0.0)
 
+class SMTPSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    smtp_server = db.Column(db.String(255), nullable=False)
+    smtp_port = db.Column(db.Integer, nullable=False)
+    smtp_username = db.Column(db.String(255), nullable=False)
+    smtp_password = db.Column(db.String(255), nullable=False)
+    smtp_use_tls = db.Column(db.Boolean, default=True)
+
 # @app.before_request
 # def clean_expired_sessions():
 #     session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
@@ -179,12 +187,30 @@ def set_monthly_fee(new_fee):
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
-# @app.route('/forgot_password', methods=['GET', 'POST'])
-# def forgot_password():
-#     return render_template('forgot_password.html')
+
 @app.route('/update_smtp_settings', methods=['GET', 'POST'])
+@login_required
 def update_smtp_settings():
-    return render_template('update_smtp_settings.html')
+    settings = SMTPSettings.query.first()  # Fetch the first SMTP settings record
+
+    if request.method == 'POST':
+        # If no settings exist, create a new entry
+        if not settings:
+            settings = SMTPSettings()
+
+        # Update settings from form input
+        settings.smtp_server = request.form.get('smtp_server')
+        settings.smtp_port = request.form.get('smtp_port', type=int)
+        settings.smtp_username = request.form.get('smtp_username')
+        settings.smtp_password = request.form.get('smtp_password')
+        settings.smtp_use_tls = bool(request.form.get('smtp_use_tls'))
+
+        db.session.add(settings)
+        db.session.commit()
+        flash("SMTP settings updated successfully!", "success")
+        return redirect(url_for('admin_dashboard'))  # Redirect admin to dashboard
+
+    return render_template('update_smtp_settings.html', settings=settings)
 
 @app.route('/admin/update_voipms_settings', methods=['GET', 'POST'])
 def update_voipms_settings():

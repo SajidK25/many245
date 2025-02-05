@@ -97,7 +97,7 @@
         <form action="{{ url_for('purchase_extra_login') }}" method="post">
             <button type="submit">Buy Extra Login (${{ config['EXTRA_LOGIN_PRICE'] }})</button>
         </form>
-        <a href="{{ url_for('user_dashboard') }}">Back to Dashboard</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="back-link">Back to Dashboard</a>
     </div>
 </body>
 </html>
