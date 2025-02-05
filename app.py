@@ -95,6 +95,13 @@ class Config(db.Model):
     key_name = db.Column(db.String(50), unique=True, nullable=False)
     key_value = db.Column(db.String(255), nullable=False)
 
+class VoipSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    api_username = db.Column(db.String(255), nullable=False)
+    api_password = db.Column(db.String(255), nullable=False)
+    sms_enabled = db.Column(db.Boolean, default=False)
+    sms_fee = db.Column(db.Float, default=0.0)
+
 @app.before_request
 def clean_expired_sessions():
     session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
@@ -161,6 +168,39 @@ def load_user(user_id):
 @app.route('/update_smtp_settings', methods=['GET', 'POST'])
 def update_smtp_settings():
     return render_template('update_smtp_settings.html')
+
+@app.route('/admin/update_voipms_settings', methods=['GET', 'POST'])
+def update_voipms_settings():
+    # Ensure only admin can access
+    # if 'user_id' not in session or User.query.get(session['user_id']).role != 'admin':
+    #     flash("Unauthorized access", "error")
+    #     return redirect(url_for('admin_dashboard'))
+
+    # Fetch existing settings from DB
+    voip_settings = VoipSettings.query.first()
+
+    if request.method == 'POST':
+        api_username = request.form['api_username']
+        api_password = request.form['api_password']
+        sms_enabled = request.form.get('sms_enabled') == 'on'
+        sms_fee = float(request.form['sms_fee']) if request.form['sms_fee'] else 0.0
+
+        if not voip_settings:
+            # Create new settings if none exist
+            voip_settings = VoipSettings(api_username=api_username, api_password=api_password, sms_enabled=sms_enabled, sms_fee=sms_fee)
+            db.session.add(voip_settings)
+        else:
+            # Update existing settings
+            voip_settings.api_username = api_username
+            voip_settings.api_password = api_password
+            voip_settings.sms_enabled = sms_enabled
+            voip_settings.sms_fee = sms_fee
+
+        db.session.commit()
+        flash("VoIP.ms settings updated successfully!", "success")
+        return redirect(url_for('admin_dashboard'))
+
+    return render_template('voipms_settings.html', settings=voip_settings)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
