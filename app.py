@@ -1,10 +1,10 @@
-from flask import Flask, render_template, redirect, url_for, request, flash,session
+from flask import Flask, render_template, redirect, url_for, request, flash,session,current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
-from itsdangerous import URLSafeTimedSerializer
+from itsdangerous import URLSafeTimedSerializer as Serializer
 from flask_mail import Mail, Message
 import os
 import stripe
@@ -13,7 +13,7 @@ import requests
 import random
 
 app = Flask(__name__)
-app.config.from_object("config.Config")
+# app.config.from_object("config.Config")
 app.secret_key = 'your_secret_key_here'
 # Use PostgreSQL in production, SQLite for local development
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
@@ -45,8 +45,12 @@ migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 bcrypt = Bcrypt(app)
+# Fetch SMTP settings from DB
+# smtp_config = get_smtp_settings()
+# if smtp_config:
+#     app.config.update(smtp_config)
+
 mail = Mail(app)
-s = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -80,6 +84,19 @@ class User(db.Model, UserMixin):
 
     def check_amazon_relay_password(self, password):
         return bcrypt.check_password_hash(self.amazon_relay_password, password)
+    # Generate a password reset token
+    def get_reset_token(self, expires_sec=1800):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        return s.dumps({'user_id': self.id})
+    # Verify the reset token
+    @staticmethod
+    def verify_reset_token(token):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(token, max_age=1800)['user_id']
+        except:
+            return None
+        return User.query.get(user_id)
 
 class LoginToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -91,9 +108,20 @@ class LoginSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     session_token = db.Column(db.String(255), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)# Generate a password reset token
+def get_reset_token(self, expires_sec=1800):
+    s = Serializer(app.config['SECRET_KEY'])
+    return s.dumps({'user_id': self.id})
 
-class Payment(db.Model):
+# Verify the reset token
+@staticmethod
+def verify_reset_token(token):
+    s = Serializer(app.config['SECRET_KEY'])
+    try:
+        user_id = s.loads(token, max_age=1800)['user_id']
+    except:
+        return None
+    return User.query.get(user_id)
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False, default=30.0)
@@ -119,7 +147,6 @@ class SMTPSettings(db.Model):
     smtp_username = db.Column(db.String(255), nullable=False)
     smtp_password = db.Column(db.String(255), nullable=False)
     smtp_use_tls = db.Column(db.Boolean, default=True)
-
 # @app.before_request
 # def clean_expired_sessions():
 #     session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
@@ -136,7 +163,17 @@ class SMTPSettings(db.Model):
 #             session.pop('login_token', None)
 #             flash("Session expired. Please log in again.", "error")
 #             return redirect(url_for('login'))
-
+def get_smtp_settings():
+    settings = SMTPSettings.query.first()
+    if not settings:
+        return None
+    return {
+        "MAIL_SERVER": settings.smtp_server,
+        "MAIL_PORT": settings.smtp_port,
+        "MAIL_USERNAME": settings.smtp_username,
+        "MAIL_PASSWORD": settings.smtp_password,
+        "MAIL_USE_TLS": settings.smtp_use_tls,
+    }
 def get_extra_login_price():
     return float(get_config_value("EXTRA_LOGIN_PRICE") or 5.00)  # Default to $5
 
@@ -155,6 +192,34 @@ def set_config_value(key_name, key_value):
         config = Config(key_name=key_name, key_value=key_value)
         db.session.add(config)
     db.session.commit()
+
+def send_email(to, subject, body):
+    """Send an email using SMTP settings from the database."""
+    
+    smtp_settings = get_smtp_settings()
+    if not smtp_settings:
+        print("⚠️ SMTP settings not configured in the database.")
+        return False
+
+    # Apply settings dynamically
+    current_app.config.update(
+        MAIL_SERVER=smtp_settings["MAIL_SERVER"],
+        MAIL_PORT=smtp_settings["MAIL_PORT"],
+        MAIL_USERNAME=smtp_settings["MAIL_USERNAME"],
+        MAIL_PASSWORD=smtp_settings["MAIL_PASSWORD"],
+        MAIL_USE_TLS=smtp_settings["MAIL_USE_TLS"],
+    )
+
+    msg = Message(subject=subject, sender=smtp_settings["MAIL_USERNAME"], recipients=[to])
+    msg.body = body
+
+    try:
+        mail.send(msg)
+        print(f"✅ Email sent successfully to {to}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send email: {e}")
+        return False
 
 def send_sms(phone_number, message):
     payload = {
@@ -313,22 +378,23 @@ def forgot_password():
     if request.method == 'POST':
         email = request.form.get('email')
         user = User.query.filter_by(email=email).first()
-
+        
         if user:
-            token = s.dumps(email, salt="password-reset-salt")
-            reset_url = url_for("reset_password", token=token, _external=True)
+            reset_token = user.get_reset_token()
+            reset_url = url_for('reset_password', token=reset_token, _external=True)
 
-            msg = Message("Password Reset Request", recipients=[email])
-            msg.body = f"Click the link to reset your password: {reset_url}"
-            mail.send(msg)
+            # Send password reset email
+            email_subject = "Password Reset Request"
+            email_body = f"Click the link below to reset your password:\n{reset_url}"
 
-            flash("A password reset link has been sent to your email.", "success")
-        else:
-            flash("No account found with that email.", "error")
+            if send_email(user.email, email_subject, email_body):
+                flash("Check your email for password reset instructions.", "success")
+            else:
+                flash("Failed to send email. Contact support.", "error")
 
-        return redirect(url_for("forgot_password"))
+        return redirect(url_for('login'))
 
-    return render_template("forgot_password.html")
+    return render_template('forgot_password.html')
 
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
