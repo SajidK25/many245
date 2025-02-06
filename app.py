@@ -4,16 +4,17 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
+from itsdangerous import URLSafeTimedSerializer
+from flask_mail import Mail, Message
 import os
 import stripe
-from flask_mail import Mail, Message
 import uuid
 import requests
 import random
 
 app = Flask(__name__)
+app.config.from_object("config.Config")
 app.secret_key = 'your_secret_key_here'
-mail = Mail(app)
 # Use PostgreSQL in production, SQLite for local development
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
@@ -23,12 +24,12 @@ app.config['SECRET_KEY'] = 'sample_secret_key_123456'
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 # SMTP Server Config
-app.config['MAIL_SERVER'] = 'smtp.example.com'  # Replace with your SMTP server
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'your_email@example.com'  # Your SMTP username
-app.config['MAIL_PASSWORD'] = 'your_email_password'  # Your SMTP password
-app.config['MAIL_DEFAULT_SENDER'] = 'your_email@example.com'
+# app.config['MAIL_SERVER'] = 'smtp.example.com'  # Replace with your SMTP server
+# app.config['MAIL_PORT'] = 587
+# app.config['MAIL_USE_TLS'] = True
+# app.config['MAIL_USERNAME'] = 'your_email@example.com'  # Your SMTP username
+# app.config['MAIL_PASSWORD'] = 'your_email_password'  # Your SMTP password
+# app.config['MAIL_DEFAULT_SENDER'] = 'your_email@example.com'
 
 # VoIP.ms Config
 app.config['VOIPMS_API_URL'] = 'https://voip.ms/api/v1/rest.php'
@@ -44,6 +45,8 @@ migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 bcrypt = Bcrypt(app)
+mail = Mail(app)
+s = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -308,42 +311,44 @@ def verify_email(token):
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
-        email = request.form['email']
+        email = request.form.get('email')
         user = User.query.filter_by(email=email).first()
+
         if user:
-            token = str(uuid.uuid4())
-            user.verification_token = token
-            db.session.commit()
+            token = s.dumps(email, salt="password-reset-salt")
+            reset_url = url_for("reset_password", token=token, _external=True)
 
-            reset_link = url_for('reset_password', token=token, _external=True)
-            message = Message(
-                'Password Reset Request',
-                recipients=[email],
-                body=f'Click the link to reset your password: {reset_link}'
-            )
-            mail.send(message)
+            msg = Message("Password Reset Request", recipients=[email])
+            msg.body = f"Click the link to reset your password: {reset_url}"
+            mail.send(msg)
 
-            flash('Password reset email sent. Please check your inbox.', 'success')
+            flash("A password reset link has been sent to your email.", "success")
         else:
-            flash('No account found with that email.', 'error')
-    return render_template('forgot_password.html')
+            flash("No account found with that email.", "error")
+
+        return redirect(url_for("forgot_password"))
+
+    return render_template("forgot_password.html")
 
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
-    user = User.query.filter_by(verification_token=token).first()
-    if not user:
-        flash('Invalid or expired token.', 'error')
-        return redirect(url_for('login'))
+    try:
+        email = s.loads(token, salt="password-reset-salt", max_age=3600)  # 1-hour expiry
+    except:
+        flash("Invalid or expired token.", "error")
+        return redirect(url_for("forgot_password"))
+
+    user = User.query.filter_by(email=email).first()
 
     if request.method == 'POST':
-        new_password = request.form['password']
+        new_password = request.form.get('password')
         user.set_password(new_password)
-        user.verification_token = None
         db.session.commit()
-        flash('Password updated successfully.', 'success')
-        return redirect(url_for('login'))
 
-    return render_template('reset_password.html', token=token)
+        flash("Your password has been reset. Please log in.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html", token=token)
 
 @app.route('/send_otp', methods=['POST'])
 @login_required
