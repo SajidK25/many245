@@ -11,6 +11,8 @@ import stripe
 import uuid
 import requests
 import random
+# from werkzeug.security import generate_password_hash
+import smtplib
 
 app = Flask(__name__)
 # app.config.from_object("config.Config")
@@ -279,6 +281,33 @@ def update_smtp_settings():
         return redirect(url_for('admin_dashboard'))  # Redirect admin to dashboard
 
     return render_template('update_smtp_settings.html', settings=settings)
+
+@app.route('/test_smtp', methods=['GET','POST'])
+@login_required
+def test_smtp():
+    """Send a test email using current SMTP settings."""
+    test_email = request.form.get("test_email")
+    if request.method == 'POST':
+        # Load SMTP settings from database
+        smtp_settings = get_smtp_settings()
+        if not smtp_settings:
+            flash("❌ SMTP settings not configured!", "error")
+            return redirect(url_for("update_smtp_settings"))
+
+        # Update Flask-Mail config
+        app.config.update(smtp_settings)
+        mail.init_app(app)
+
+        try:
+            msg = Message("Test Email", sender=smtp_settings["MAIL_USERNAME"], recipients=[test_email])
+            msg.body = "This is a test email to verify SMTP settings."
+            mail.send(msg)
+            flash(f"✅ Test email sent to {test_email} successfully!", "success")
+        except smtplib.SMTPException as e:
+            flash(f"❌ Failed to send test email: {str(e)}", "error")
+
+        return redirect(url_for("test_smtp"))
+    return render_template('test_smtp.html')
 
 @app.route('/admin/update_voipms_settings', methods=['GET', 'POST'])
 def update_voipms_settings():
