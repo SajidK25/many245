@@ -295,8 +295,13 @@ def test_smtp():
             return redirect(url_for("update_smtp_settings"))
 
         # Update Flask-Mail config
-        app.config.update(smtp_settings)
-        mail.init_app(app)
+        current_app.config.update(
+            MAIL_SERVER=smtp_settings["MAIL_SERVER"],
+            MAIL_PORT=smtp_settings["MAIL_PORT"],
+            MAIL_USERNAME=smtp_settings["MAIL_USERNAME"],
+            MAIL_PASSWORD=smtp_settings["MAIL_PASSWORD"],
+            MAIL_USE_TLS=smtp_settings["MAIL_USE_TLS"],
+        )
 
         try:
             msg = Message("Test Email", sender=smtp_settings["MAIL_USERNAME"], recipients=[test_email])
