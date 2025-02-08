@@ -139,6 +139,8 @@ class VoipSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     api_username = db.Column(db.String(255), nullable=False)
     api_password = db.Column(db.String(255), nullable=False)
+    api_did = db.Column(db.Integer, nullable=False)
+    api_url = db.Column(db.String(255), nullable=False)
     sms_enabled = db.Column(db.Boolean, default=False)
     sms_fee = db.Column(db.Float, default=0.0)
 
@@ -176,6 +178,20 @@ def get_smtp_settings():
         "MAIL_PASSWORD": settings.smtp_password,
         "MAIL_USE_TLS": settings.smtp_use_tls,
     }
+
+def get_voipms_settings():
+    settings = VoipSettings.query.first()
+    if not settings:
+        return None
+    return {
+        "API_USERNAME": settings.api_username,
+        "API_PASSWORD": settings.api_password,
+        "API_DID": settings.api_did,
+        "API_URL": settings.api_url,
+        "SMS_ENABLED": settings.sms_enabled,
+        "SMS_FEE": settings.sms_fee,
+    }
+
 def get_extra_login_price():
     return float(get_config_value("EXTRA_LOGIN_PRICE") or 5.00)  # Default to $5
 
@@ -223,16 +239,61 @@ def send_email(to, subject, body):
         print(f"❌ Failed to send email: {e}")
         return False
 
-def send_sms(phone_number, message):
-    payload = {
-        'api_username': app.config['VOIPMS_API_USERNAME'],
-        'api_password': app.config['VOIPMS_API_PASSWORD'],
-        'did': 'Your_VoIP_DID_Number',  # Replace with your DID number
-        'dst': phone_number,
-        'message': message
+def send_sms(destination, message):
+    """
+    Send an SMS using VoIP.ms API.
+    
+    Parameters:
+        did (str): Your VoIP.ms DID (number) to send the SMS from.
+        destination (str): The destination phone number (international format, e.g., +1234567890).
+        message (str): The text message to send.
+    """
+    voipms_settings = get_voipms_settings()
+    if not voipms_settings:
+        flash("❌ VoIP.ms settings not configured!", "error")
+        return redirect(url_for("update_voipms_settings"))
+
+    # Update Flask-Mail config
+    current_app.config.update(
+        API_USERNAME=voipms_settings["API_USERNAME"],
+        API_PASSWORD=voipms_settings["API_PASSWORD"],
+        API_DID=voipms_settings["API_DID"],
+        API_URL=voipms_settings["API_URL"],
+    )
+    # API parameters
+    params = {
+        "api_username": voipms_settings["API_USERNAME"],
+        "api_password": voipms_settings["API_PASSWORD"],
+        "method": "sendSMS",
+        "did": voipms_settings["API_DID"],  # Your VoIP.ms DID
+        "dst": destination,  # Destination number
+        "message": message,  # Message content
     }
-    response = requests.post(app.config['VOIPMS_API_URL'], data=payload)
-    return response.json()
+
+    # Send request
+    try:
+        response = requests.get(voipms_settings["API_URL"], params=params)
+        response_data = response.json()
+
+        # Check API response
+        if response_data.get("status") == "success":
+            print("SMS sent successfully!")
+        else:
+            print(f"Error: {response_data.get('status')} - {response_data.get('message')}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
+# def send_sms(phone_number, message):
+    
+#     payload = {
+#         'api_username': app.config['VOIPMS_API_USERNAME'],
+#         'api_password': app.config['VOIPMS_API_PASSWORD'],
+#         'did': 'Your_VoIP_DID_Number',  # Replace with your DID number
+#         'dst': phone_number,
+#         'message': message
+#     }
+#     response = requests.post(app.config['VOIPMS_API_URL'], data=payload)
+#     return response.json()
 
 def notify_user(user, message):
     if user.notifications:
@@ -314,6 +375,23 @@ def test_smtp():
         return redirect(url_for("test_smtp"))
     return render_template('test_smtp.html')
 
+@app.route('/test_sms', methods=['GET','POST'])
+@login_required
+def test_sms():
+    """Send a test email using current SMTP settings."""
+    dest_no = request.form.get("dest_no")
+    test_sms = request.form.get("test_sms")
+    if request.method == 'POST':
+
+        try:
+            send_sms(dest_no, test_sms)
+            flash(f"✅ Test sms sent to {dest_no} successfully!", "success")
+        except Exception as e:
+            flash(f"❌ Failed to send test sms: {str(e)}", "error")
+
+        return redirect(url_for("test_sms"))
+    return render_template('test_voipms.html')
+
 @app.route('/admin/update_voipms_settings', methods=['GET', 'POST'])
 def update_voipms_settings():
     # Ensure only admin can access
@@ -327,17 +405,21 @@ def update_voipms_settings():
     if request.method == 'POST':
         api_username = request.form['api_username']
         api_password = request.form['api_password']
+        api_did = request.form['api_did']
+        api_url = request.form['api_url']
         sms_enabled = request.form.get('sms_enabled') == 'on'
         sms_fee = float(request.form['sms_fee']) if request.form['sms_fee'] else 0.0
 
         if not voip_settings:
             # Create new settings if none exist
-            voip_settings = VoipSettings(api_username=api_username, api_password=api_password, sms_enabled=sms_enabled, sms_fee=sms_fee)
+            voip_settings = VoipSettings(api_username=api_username, api_password=api_password, api_did=api_did,api_url=api_url,sms_enabled=sms_enabled, sms_fee=sms_fee)
             db.session.add(voip_settings)
         else:
             # Update existing settings
             voip_settings.api_username = api_username
             voip_settings.api_password = api_password
+            voip_settings.api_did = api_did
+            voip_settings.api_url = api_url
             voip_settings.sms_enabled = sms_enabled
             voip_settings.sms_fee = sms_fee
 

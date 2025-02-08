@@ -128,6 +128,12 @@
         <label for="api_password">API Password:</label>
         <input type="password" id="api_password" name="api_password" value="{{ settings.api_password if settings else '' }}" required>
 
+        <label for="api_did">API DID:</label>
+        <input type="text" id="api_did" name="api_did" value="{{ settings.api_did if settings else '' }}" required>
+
+        <label for="api_url">API URL:</label>
+        <input type="text" id="api_url" name="api_url" value="{{ settings.api_url if settings else '' }}" required>
+        
         <label for="sms_enabled">Enable SMS Notifications:</label>
         <input type="checkbox" id="sms_enabled" name="sms_enabled" {% if settings and settings.sms_enabled %}checked{% endif %}>
 
