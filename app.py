@@ -151,6 +151,8 @@ class SMTPSettings(db.Model):
     smtp_username = db.Column(db.String(255), nullable=False)
     smtp_password = db.Column(db.String(255), nullable=False)
     smtp_use_tls = db.Column(db.Boolean, default=True)
+    smtp_use_ssl = db.Column(db.Boolean, default=True)
+    default_sender = db.Column(db.String(255), nullable=True)
 # @app.before_request
 # def clean_expired_sessions():
 #     session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
@@ -177,6 +179,8 @@ def get_smtp_settings():
         "MAIL_USERNAME": settings.smtp_username,
         "MAIL_PASSWORD": settings.smtp_password,
         "MAIL_USE_TLS": settings.smtp_use_tls,
+        "MAIL_USE_SSL": settings.smtp_use_ssl,
+        "MAIL_DEFAULT_SENDER": settings.default_sender,
     }
 
 def get_voipms_settings():
@@ -226,6 +230,8 @@ def send_email(to, subject, body):
         MAIL_USERNAME=smtp_settings["MAIL_USERNAME"],
         MAIL_PASSWORD=smtp_settings["MAIL_PASSWORD"],
         MAIL_USE_TLS=smtp_settings["MAIL_USE_TLS"],
+        MAIL_USE_SSL=smtp_settings["MAIL_USE_SSL"],
+        MAIL_DEFAULT_SENDER=smtp_settings["MAIL_DEFAULT_SENDER"],
     )
 
     msg = Message(subject=subject, sender=smtp_settings["MAIL_USERNAME"], recipients=[to])
@@ -335,6 +341,8 @@ def update_smtp_settings():
         settings.smtp_username = request.form.get('smtp_username')
         settings.smtp_password = request.form.get('smtp_password')
         settings.smtp_use_tls = bool(request.form.get('smtp_use_tls'))
+        settings.smtp_use_ssl = bool(request.form.get('smtp_use_ssl'))
+        settings.default_sender = request.form.get('default_sender')
 
         db.session.add(settings)
         db.session.commit()
@@ -362,8 +370,10 @@ def test_smtp():
             MAIL_USERNAME=smtp_settings["MAIL_USERNAME"],
             MAIL_PASSWORD=smtp_settings["MAIL_PASSWORD"],
             MAIL_USE_TLS=smtp_settings["MAIL_USE_TLS"],
+            MAIL_USE_SSL=smtp_settings["MAIL_USE_SSL"],
+            MAIL_DEFAULT_SENDER=smtp_settings["MAIL_DEFAULT_SENDER"],
         )
-
+        mail = Mail(current_app)
         try:
             msg = Message("Test Email", sender=smtp_settings["MAIL_USERNAME"], recipients=[test_email])
             msg.body = "This is a test email to verify SMTP settings."

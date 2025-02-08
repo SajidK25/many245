@@ -89,9 +89,14 @@
             <label for="smtp_password">SMTP Password</label>
             <input type="password" id="smtp_password" name="smtp_password" value="{{ settings.smtp_password }}" required>
 
+            <label for="default_sender">Default Email</label>
+            <input type="email" id="default_sender" name="default_sender" value="{{ settings.default_sender }}" required>
+
             <label for="smtp_use_tls">Use TLS</label>
             <input type="checkbox" id="smtp_use_tls" name="smtp_use_tls" {% if settings.smtp_use_tls %}checked{% endif %}>
 
+            <label for="smtp_use_ssl">Use SSL</label>
+            <input type="checkbox" id="smtp_use_ssl" name="smtp_use_ssl" {% if settings.smtp_use_ssl %}checked{% endif %}>
             <button type="submit">Save Settings</button>
         </form>
         
