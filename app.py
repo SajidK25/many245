@@ -4,7 +4,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
-from itsdangerous import URLSafeTimedSerializer as Serializer
+from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired, BadTimeSignature,BadSignature
 from flask_mail import Mail, Message
 import os
 import stripe
@@ -89,16 +89,18 @@ class User(db.Model, UserMixin):
     # Generate a password reset token
     def get_reset_token(self, expires_sec=1800):
         s = Serializer(current_app.config['SECRET_KEY'])
-        return s.dumps({'user_id': self.id})
+        return s.dumps({'email': self.email})
     # Verify the reset token
     @staticmethod
     def verify_reset_token(token):
         s = Serializer(current_app.config['SECRET_KEY'])
         try:
-            user_id = s.loads(token, max_age=1800)['user_id']
+            email = s.loads(token, max_age=1800)['email']
         except:
             return None
-        return User.query.get(user_id)
+        # return User.query.get(email)
+        return email
+
 
 class LoginToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -111,24 +113,15 @@ class LoginSession(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     session_token = db.Column(db.String(255), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)# Generate a password reset token
-def get_reset_token(self, expires_sec=1800):
-    s = Serializer(app.config['SECRET_KEY'])
-    return s.dumps({'user_id': self.id})
 
-# Verify the reset token
-@staticmethod
-def verify_reset_token(token):
-    s = Serializer(app.config['SECRET_KEY'])
-    try:
-        user_id = s.loads(token, max_age=1800)['user_id']
-    except:
-        return None
-    return User.query.get(user_id)
+class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False, default=30.0)
     date = db.Column(db.DateTime, default=datetime.utcnow)
     payment_method = db.Column(db.String(20), nullable=False)  # 'cash', 'check', 'credit_card'
+    status = db.Column(db.String(20), nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
 class Config(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -153,22 +146,7 @@ class SMTPSettings(db.Model):
     smtp_use_tls = db.Column(db.Boolean, default=True)
     smtp_use_ssl = db.Column(db.Boolean, default=True)
     default_sender = db.Column(db.String(255), nullable=True)
-# @app.before_request
-# def clean_expired_sessions():
-#     session_lifetime = timedelta(hours=24)  # Auto-expire after 24 hours
-#     expiry_time = datetime.utcnow() - session_lifetime
-#     LoginToken.query.filter(LoginToken.created_at < expiry_time).delete()
-#     db.session.commit()
 
-# @app.before_request
-# def validate_active_session():
-#     if current_user.is_authenticated and current_user.role != "admin":
-#         token = session.get('login_token')
-#         if not token or not LoginSession.query.filter_by(session_token=token).first():
-#             logout_user()
-#             session.pop('login_token', None)
-#             flash("Session expired. Please log in again.", "error")
-#             return redirect(url_for('login'))
 def get_smtp_settings():
     settings = SMTPSettings.query.first()
     if not settings:
@@ -233,7 +211,7 @@ def send_email(to, subject, body):
         MAIL_USE_SSL=smtp_settings["MAIL_USE_SSL"],
         MAIL_DEFAULT_SENDER=smtp_settings["MAIL_DEFAULT_SENDER"],
     )
-
+    mail = Mail(current_app)
     msg = Message(subject=subject, sender=smtp_settings["MAIL_USERNAME"], recipients=[to])
     msg.body = body
 
@@ -469,22 +447,40 @@ def register():
 
     return render_template('register.html')
 
-@app.route('/send_verification_email', methods=['POST'])
+@app.route('/send_verification_email', methods=['GET','POST'])
 @login_required
 def send_verification_email():
     token = str(uuid.uuid4())
     current_user.verification_token = token
     db.session.commit()
+    if request.method == 'POST':
+        # Load SMTP settings from database
+        smtp_settings = get_smtp_settings()
+        if not smtp_settings:
+            flash("❌ SMTP settings not configured!", "error")
+            return redirect(url_for("update_smtp_settings"))
 
-    verification_link = url_for('verify_email', token=token, _external=True)
-    message = Message(
-        'Email Verification',
-        recipients=[current_user.email],
-        body=f'Click the link to verify your email: {verification_link}'
-    )
-    mail.send(message)
+        # Update Flask-Mail config
+        current_app.config.update(
+            MAIL_SERVER=smtp_settings["MAIL_SERVER"],
+            MAIL_PORT=smtp_settings["MAIL_PORT"],
+            MAIL_USERNAME=smtp_settings["MAIL_USERNAME"],
+            MAIL_PASSWORD=smtp_settings["MAIL_PASSWORD"],
+            MAIL_USE_TLS=smtp_settings["MAIL_USE_TLS"],
+            MAIL_USE_SSL=smtp_settings["MAIL_USE_SSL"],
+            MAIL_DEFAULT_SENDER=smtp_settings["MAIL_DEFAULT_SENDER"],
+        )
+        
+        mail = Mail(current_app)
+        verification_link = url_for('verify_email', token=token, _external=True)
+        message = Message(
+            'Email Verification',
+            recipients=[current_user.email],
+            body=f'Click the link to verify your email: {verification_link}'
+        )
+        mail.send(message)
 
-    flash('Verification email sent. Please check your inbox.', 'success')
+        flash('Verification email sent. Please check your inbox.', 'success')
     return redirect(url_for('user_dashboard'))
 
 @app.route('/verify_email/<token>')
@@ -524,8 +520,11 @@ def forgot_password():
 
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
+    s = Serializer(current_app.config['SECRET_KEY'])
     try:
-        email = s.loads(token, salt="password-reset-salt", max_age=3600)  # 1-hour expiry
+        # email = s.loads(token, max_age=3600)['email']
+        # email = s.loads(token, salt="password-reset-salt", max_age=3600)  # 1-hour expiry
+        email = User.verify_reset_token(token)
     except:
         flash("Invalid or expired token.", "error")
         return redirect(url_for("forgot_password"))

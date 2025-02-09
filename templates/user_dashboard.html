@@ -108,7 +108,12 @@
         </div>
         <div class="user-info">
             <p><strong>Role:</strong> {{ current_user.role }}</p>
-            <p><strong>Email:</strong> {{ current_user.email }}</p>
+            <p><strong>Email:</strong> {{ current_user.email }} 
+            {% if not current_user.is_verified %}
+            <a href="{{ url_for('send_verification_email') }}" class="btn btn-warning">Verify Email</a>
+            {% else %}
+                <p>✅ Email Verified</p>
+            {% endif %}</p>
             <p><strong>Phone Number:</strong> {{ current_user.phone_number }}</p>
             <p><strong>Notifications:</strong> {% if current_user.notifications %}Enabled{% else %}Disabled{% endif %}</p>
             <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
