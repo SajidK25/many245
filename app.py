@@ -32,9 +32,9 @@ app.config['VOIPMS_API_USERNAME'] = 'your_voipms_username'
 app.config['VOIPMS_API_PASSWORD'] = 'your_voipms_password'
 
 # Stripe Config
-app.config["STRIPE_SECRET_KEY"] = "sk_test_51NMxkQIZICHcZPEm4n3HHzD0GvHr9wOrMRyx6QYwf9iyNaonTDtnzAGQKu8LdrCMW9PtCwQ27iNXCvZiRCTHA5vu00DRHSeT6q"
-app.config["STRIPE_PUBLIC_KEY"] = "pk_test_51NMxkQIZICHcZPEmnoQeiVodkGmZanhXAjVu0ejfQAVATDmzwolH4h0gWLhysK1yaIn22zxVZ3RkfnlpgxRpuEQe00T4gARtsU"
-stripe.api_key = app.config['STRIPE_SECRET_KEY']
+# app.config["STRIPE_SECRET_KEY"] = "sk_test_51NMxkQIZICHcZPEm4n3HHzD0GvHr9wOrMRyx6QYwf9iyNaonTDtnzAGQKu8LdrCMW9PtCwQ27iNXCvZiRCTHA5vu00DRHSeT6q"
+# app.config["STRIPE_PUBLIC_KEY"] = "pk_test_51NMxkQIZICHcZPEmnoQeiVodkGmZanhXAjVu0ejfQAVATDmzwolH4h0gWLhysK1yaIn22zxVZ3RkfnlpgxRpuEQe00T4gARtsU"
+
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -205,6 +205,7 @@ def send_email(to, subject, body):
         MAIL_USE_SSL=smtp_settings["MAIL_USE_SSL"],
         MAIL_DEFAULT_SENDER=smtp_settings["MAIL_DEFAULT_SENDER"],
     )
+
     mail = Mail(current_app)
     msg = Message(subject=subject, sender=smtp_settings["MAIL_USERNAME"], recipients=[to])
     msg.body = body
@@ -767,7 +768,6 @@ def mark_paid(user_id):
         return redirect(url_for('dashboard'))
 
     user = User.query.get_or_404(user_id)
-
     if request.method == 'POST':
         payment_method = request.form['payment_method']
         amount = float(request.form.get('amount', 30.0))
@@ -848,14 +848,16 @@ def process_payment(user_id):
 @app.route('/stripe_payment/<int:user_id>/<float:amount>')
 def stripe_payment(user_id, amount):
     user = User.query.get(user_id)
+    stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
     if not user or not user.stripe_enabled:
         flash("User not found or Stripe not enabled", "error")
         return redirect(url_for('admin_dashboard'))
 
-    return render_template("stripe_payment.html", user_id=user_id, amount=amount, stripe_public_key=app.config['STRIPE_PUBLIC_KEY'])
+    return render_template("stripe_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
 
 @app.route('/charge/<int:user_id>', methods=['POST'])
 def charge(user_id):
+    stripe.api_key = get_config_value("STRIPE_SECRET_KEY")
     user = User.query.get(user_id)
     if not user:
         return jsonify({"success": False, "message": "User not found"}), 400
