@@ -626,7 +626,7 @@ def update_login_price():
 
     new_price = request.form["extra_login_price"]
     try:
-        set_extra_login_price(float(new_price))
+        set_extra_login_price(round(float(new_price),2))
         flash("Extra login price updated successfully!", "success")
     except ValueError:
         flash("Invalid price entered.", "error")
@@ -711,7 +711,7 @@ def admin_dashboard():
         return redirect(url_for('login'))
     users = User.query.all()
     now = datetime.utcnow().date()
-    return render_template('admin_dashboard.html', users=users,now=now,monthly_fee=get_monthly_fee())
+    return render_template('admin_dashboard.html', users=users,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price())
 
 @app.route('/user_dashboard')
 @login_required
@@ -1017,7 +1017,7 @@ def update_monthly_fee():
 
     new_fee = request.form["monthly_fee"]
     try:
-        set_monthly_fee(float(new_fee))
+        set_monthly_fee(round(float(new_fee),2))
         flash("Monthly fee updated successfully!", "success")
     except ValueError:
         flash("Invalid amount. Please enter a valid number.", "error")
