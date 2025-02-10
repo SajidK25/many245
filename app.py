@@ -26,26 +26,11 @@ app.config['SECRET_KEY'] = 'sample_secret_key_123456'
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 
-# VoIP.ms Config
-app.config['VOIPMS_API_URL'] = 'https://voip.ms/api/v1/rest.php'
-app.config['VOIPMS_API_USERNAME'] = 'your_voipms_username'
-app.config['VOIPMS_API_PASSWORD'] = 'your_voipms_password'
-
-# Stripe Config
-# app.config["STRIPE_SECRET_KEY"] = "sk_test_51NMxkQIZICHcZPEm4n3HHzD0GvHr9wOrMRyx6QYwf9iyNaonTDtnzAGQKu8LdrCMW9PtCwQ27iNXCvZiRCTHA5vu00DRHSeT6q"
-# app.config["STRIPE_PUBLIC_KEY"] = "pk_test_51NMxkQIZICHcZPEmnoQeiVodkGmZanhXAjVu0ejfQAVATDmzwolH4h0gWLhysK1yaIn22zxVZ3RkfnlpgxRpuEQe00T4gARtsU"
-
-
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 bcrypt = Bcrypt(app)
-# Fetch SMTP settings from DB
-# smtp_config = get_smtp_settings()
-# if smtp_config:
-#     app.config.update(smtp_config)
-
 mail = Mail(app)
 
 class User(db.Model, UserMixin):
