@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash,session,current_app
+from flask import Flask, render_template, redirect, url_for, request, flash,session,current_app,jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
@@ -25,13 +25,6 @@ app.config['SECRET_KEY'] = 'sample_secret_key_123456'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
-# SMTP Server Config
-# app.config['MAIL_SERVER'] = 'smtp.example.com'  # Replace with your SMTP server
-# app.config['MAIL_PORT'] = 587
-# app.config['MAIL_USE_TLS'] = True
-# app.config['MAIL_USERNAME'] = 'your_email@example.com'  # Your SMTP username
-# app.config['MAIL_PASSWORD'] = 'your_email_password'  # Your SMTP password
-# app.config['MAIL_DEFAULT_SENDER'] = 'your_email@example.com'
 
 # VoIP.ms Config
 app.config['VOIPMS_API_URL'] = 'https://voip.ms/api/v1/rest.php'
@@ -39,8 +32,9 @@ app.config['VOIPMS_API_USERNAME'] = 'your_voipms_username'
 app.config['VOIPMS_API_PASSWORD'] = 'your_voipms_password'
 
 # Stripe Config
-app.config["STRIPE_SECRET_KEY"] = "your_secret_key"
-app.config["STRIPE_PUBLIC_KEY"] = "your_public_key"
+app.config["STRIPE_SECRET_KEY"] = "sk_test_51NMxkQIZICHcZPEm4n3HHzD0GvHr9wOrMRyx6QYwf9iyNaonTDtnzAGQKu8LdrCMW9PtCwQ27iNXCvZiRCTHA5vu00DRHSeT6q"
+app.config["STRIPE_PUBLIC_KEY"] = "pk_test_51NMxkQIZICHcZPEmnoQeiVodkGmZanhXAjVu0ejfQAVATDmzwolH4h0gWLhysK1yaIn22zxVZ3RkfnlpgxRpuEQe00T4gARtsU"
+stripe.api_key = app.config['STRIPE_SECRET_KEY']
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -824,28 +818,76 @@ def view_payments():
 @app.route("/admin/process_payment/<int:user_id>", methods=["POST"])
 @login_required
 def process_payment(user_id):
-    if current_user.role != "admin":
-        flash("Unauthorized access!", "error")
-        return redirect(url_for("admin_dashboard"))
+    user = User.query.get(user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for('admin_dashboard'))
 
-    user = User.query.get_or_404(user_id)
-    amount = float(request.form["amount"]) * 100  # Convert dollars to cents
+    payment_method = request.form.get('payment_method')
+    amount = float(request.form.get('amount', 0))
+
+    if payment_method in ['cash', 'check']:
+        user.is_paid = True
+        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+        payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
+        db.session.add(payment)
+        db.session.commit()
+        flash("Payment recorded successfully!", "success")
+        return redirect(url_for('admin_dashboard'))
+
+    elif payment_method == 'card':
+        if not user.stripe_enabled:
+            flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
+            return redirect(url_for('admin_dashboard'))
+
+        return redirect(url_for('stripe_payment', user_id=user.id, amount=amount))
+
+    flash("Invalid payment method selected", "error")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/stripe_payment/<int:user_id>/<float:amount>')
+def stripe_payment(user_id, amount):
+    user = User.query.get(user_id)
+    if not user or not user.stripe_enabled:
+        flash("User not found or Stripe not enabled", "error")
+        return redirect(url_for('admin_dashboard'))
+
+    return render_template("stripe_payment.html", user_id=user_id, amount=amount, stripe_public_key=app.config['STRIPE_PUBLIC_KEY'])
+
+@app.route('/charge/<int:user_id>', methods=['POST'])
+def charge(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 400
+
+    data = request.get_json()
+    payment_method_id = data.get("payment_method_id")
+    amount = float(data.get("amount", 0)) * 100  # Convert to cents
 
     try:
-        charge = stripe.Charge.create(
+        # Create a payment intent with redirect disabled
+        intent = stripe.PaymentIntent.create(
             amount=int(amount),
             currency="usd",
-            description=f"Payment for {user.username}",
-            source=request.form["stripeToken"],
+            payment_method=payment_method_id,
+            confirm=True,
+            automatic_payment_methods={
+                "enabled": True,
+                "allow_redirects": "never"  # Disable redirect-based methods
+            }
         )
-        user.is_paid = True
-        user.payment_due_date = datetime.utcnow().date() + timedelta(days=30)
-        db.session.commit()
-        flash("Payment processed successfully!", "success")
-    except stripe.error.StripeError as e:
-        flash(f"Payment failed: {e.user_message}", "error")
 
-    return redirect(url_for("admin_dashboard"))
+        # Save successful payment
+        user.is_paid = True
+        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+        payment = Payment(user_id=user.id, amount=amount / 100, payment_method="card", status="success")
+        db.session.add(payment)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Payment successful!"})
+
+    except stripe.error.StripeError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
 
 @app.route("/admin/update_stripe_keys", methods=["GET", "POST"])
 @login_required
