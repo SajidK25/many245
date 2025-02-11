@@ -134,15 +134,15 @@
             </div>
             <div class="form-group">
                 <button type="submit">Save Amazon Relay Credentials</button>
-            </div>
+            </div>                          
         </form>
-        <form class="form-purchase" action="{{ url_for('purchase_extra_login') }}" method="post">
-            <button type="submit">Buy A Plan (${{ extra_login_price }})</button>
+        <form class="form-purchase" action="{{ url_for('pay_subscription', user_id=current_user.id) }}" method="post">
+            <button type="submit">Buy A Plan (${{ monthly_fee }})</button>
         </form>
-        <form class="form-purchase" action="{{ url_for('purchase_extra_login') }}" method="post">
-            <button type="submit">Buy SMS Notification (${{ extra_login_price }})</button>
+        <form class="form-purchase" action="{{ url_for('pay_sms_notification',user_id=current_user.id) }}" method="post">
+            <button type="submit">Buy SMS Notification (${{ sms_fee }})</button>
         </form>
-        <form class="form-purchase" action="{{ url_for('purchase_extra_login') }}" method="post">
+        <form class="form-purchase" action="{{ url_for('pay_extra_login',user_id=current_user.id) }}" method="post">
             <button type="submit">Buy Extra Login (${{ extra_login_price }})</button>
         </form>
 

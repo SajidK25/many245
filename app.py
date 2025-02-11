@@ -709,7 +709,7 @@ def user_dashboard():
         flash('Access restricted. Please contact the admin to make a payment.', 'error')
         return redirect(url_for('login'))
     now = datetime.utcnow().date()
-    return render_template('user_dashboard.html',now=now)
+    return render_template('user_dashboard.html',users=current_user,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=10.0)
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -830,6 +830,131 @@ def process_payment(user_id):
     flash("Invalid payment method selected", "error")
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/user/pay_subscription/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def pay_subscription(user_id):
+    # if current_user.role != 'admin':
+    #     flash('Unauthorized access!', 'error')
+    #     return redirect(url_for('dashboard'))
+
+    user = User.query.get_or_404(user_id)
+    # if request.method == 'POST':
+    #     payment_method = request.form['payment_method']
+    #     amount = float(request.form.get('amount', 30.0))
+
+    #     user.is_paid = True
+    #     user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+    #     payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method)
+    #     db.session.add(payment)
+    #     db.session.commit()
+
+    #     flash(f"Payment of ${amount} recorded for {user.username}. Next payment due on {user.payment_due_date.strftime('%Y-%m-%d')}.", 'success')
+    #     return redirect(url_for('admin_dashboard'))
+
+    return render_template('payment_subscription.html', user=user)
+
+@app.route("/user/process_subscription_payment/<int:user_id>", methods=["POST"])
+@login_required
+def process_subscription_payment(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for('user_dashboard'))
+
+    payment_method = request.form.get('payment_method')
+    amount = float(request.form.get('amount', 0))
+
+    if payment_method in ['cash', 'check']:
+        user.is_paid = True
+        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+        payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
+        db.session.add(payment)
+        db.session.commit()
+        flash("Payment recorded successfully!", "success")
+        return redirect(url_for('user_dashboard'))
+
+    elif payment_method == 'card':
+        if not user.stripe_enabled:
+            flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
+            return redirect(url_for('user_dashboard'))
+
+        return redirect(url_for('user_stripe_payment', user_id=user.id, amount=amount))
+
+    flash("Invalid payment method selected", "error")
+    return redirect(url_for('user_dashboard'))
+
+@app.route('/user/pay_sms_notification/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def pay_sms_notification(user_id):
+    user = User.query.get_or_404(user_id)
+    return render_template('pay_sms_notification.html', user=user)
+
+@app.route("/user/process_sms_payment/<int:user_id>", methods=["POST"])
+@login_required
+def process_sms_payment(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for('user_dashboard'))
+
+    payment_method = request.form.get('payment_method')
+    amount = float(request.form.get('amount', 0))
+
+    if payment_method in ['cash', 'check']:
+        user.is_paid = True
+        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+        payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
+        db.session.add(payment)
+        db.session.commit()
+        flash("Payment recorded successfully!", "success")
+        return redirect(url_for('user_dashboard'))
+
+    elif payment_method == 'card':
+        if not user.stripe_enabled:
+            flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
+            return redirect(url_for('user_dashboard'))
+
+        return redirect(url_for('user_stripe_payment', user_id=user.id, amount=amount))
+
+    flash("Invalid payment method selected", "error")
+    return redirect(url_for('user_dashboard'))
+
+@app.route('/user/pay_extra_login/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def pay_extra_login(user_id):
+    user = User.query.get_or_404(user_id)
+    return render_template('pay_extra_login.html', user=user)
+
+@app.route("/user/process_extra_login_payment/<int:user_id>", methods=["POST"])
+@login_required
+def process_extra_login_payment(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for('user_dashboard'))
+
+    payment_method = request.form.get('payment_method')
+    amount = float(request.form.get('amount', 0))
+
+    if payment_method in ['cash', 'check']:
+        user.is_paid = True
+        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+        payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
+        db.session.add(payment)
+        db.session.commit()
+        flash("Payment recorded successfully!", "success")
+        return redirect(url_for('user_dashboard'))
+
+    elif payment_method == 'card':
+        if not user.stripe_enabled:
+            flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
+            return redirect(url_for('user_dashboard'))
+
+        return redirect(url_for('user_stripe_payment', user_id=user.id, amount=amount))
+
+    flash("Invalid payment method selected", "error")
+    return redirect(url_for('user_dashboard'))
+
 @app.route('/stripe_payment/<int:user_id>/<float:amount>')
 def stripe_payment(user_id, amount):
     user = User.query.get(user_id)
@@ -839,6 +964,16 @@ def stripe_payment(user_id, amount):
         return redirect(url_for('admin_dashboard'))
 
     return render_template("stripe_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
+
+@app.route('/user_stripe_payment/<int:user_id>/<float:amount>')
+def user_stripe_payment(user_id, amount):
+    user = User.query.get(user_id)
+    stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
+    if not user or not user.stripe_enabled:
+        flash("User not found or Stripe not enabled", "error")
+        return redirect(url_for('user_dashboard'))
+
+    return render_template("user_stripe_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
 
 @app.route('/charge/<int:user_id>', methods=['POST'])
 def charge(user_id):

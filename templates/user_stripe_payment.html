@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stripe Payment</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        #card-element {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Stripe Payment for ${{ amount }}</h2>
+
+    <form id="payment-form">
+        <label for="name">Name on Card:</label>
+        <input type="text" id="name" required>
+        <br><br>
+
+        <div id="card-element">
+            <!-- Stripe Elements will create this input -->
+        </div>
+        <br>
+
+        <button id="submit-button">Pay ${{ amount }}</button>
+    </form>
+
+    <div id="payment-result"></div>
+
+    <script>
+        var stripe = Stripe("{{ stripe_public_key }}");
+        var elements = stripe.elements();
+        var cardElement = elements.create('card');
+        cardElement.mount('#card-element');
+
+        document.getElementById("payment-form").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            var {paymentMethod, error} = await stripe.createPaymentMethod({
+                type: "card",
+                card: cardElement,
+                billing_details: {name: document.getElementById("name").value}
+            });
+
+            if (error) {
+                document.getElementById("payment-result").innerText = error.message;
+            } else {
+                fetch("{{ url_for('charge', user_id=user_id) }}", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ payment_method_id: paymentMethod.id, amount: "{{ amount }}" })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("payment-result").innerText = data.message;
+                    if (data.success) {
+                        window.location.href = "{{ url_for('user_dashboard') }}";
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
