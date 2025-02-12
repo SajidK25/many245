@@ -167,7 +167,7 @@
                     <td>
                         <form action="{{ url_for('toggle_sms_opt_in', user_id=user.id) }}" method="post">
                             <button type="submit">
-                                {% if user.sms_opt_in %}Disable SMS{% else %}Enable SMS ($10.00){% endif %}
+                                {% if user.sms_opt_in %}Disable SMS{% else %}Enable SMS ({{ "%.2f"|format(sms_fee) }}){% endif %}
                             </button>
                         </form>
                     </td>
@@ -200,6 +200,16 @@
                 <div class="form-group">
                     <label for="extra_login_price">Price per Extra Login ($)</label>
                     <input type="number" id="extra_login_price" name="extra_login_price" value="{{ "%.2f"|format(extra_login_price) }}"  step="0.01" required>
+                </div>
+                <button type="submit">Update Price</button>
+            </form>
+        </div>
+        <div class="section">
+            <h2>SMS Subscription Price</h2>
+            <form action="{{ url_for('update_sms_price') }}" method="post">
+                <div class="form-group">
+                    <label for="sms_price">Price per Extra Login ($)</label>
+                    <input type="number" id="sms_price" name="sms_price" value="{{ "%.2f"|format(sms_fee) }}"  step="0.01" required>
                 </div>
                 <button type="submit">Update Price</button>
             </form>

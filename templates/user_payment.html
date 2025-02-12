@@ -1,8 +1,0 @@
-<form action="{{ url_for('user_payment') }}" method="post">
-    <script src="https://checkout.stripe.com/checkout.js" class="stripe-button"
-        data-key="{{ stripe_public_key }}"
-        data-description="User Payment"
-        data-amount="3000"
-        data-currency="usd">
-    </script>
-</form>

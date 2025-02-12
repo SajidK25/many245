@@ -121,6 +121,7 @@
                 <p><strong>Next Payment Due:</strong> {{ current_user.payment_due_date.strftime('%Y-%m-%d') }}</p>
                 {% set days_remaining = (current_user.payment_due_date - now).days %}
                 <p><strong>Days Remaining:</strong> {% if days_remaining >= 0 %}{{ days_remaining }} days{% else %}Payment expired{% endif %}</p>
+                <p><strong>Max Allowed Logins:</strong> {{ current_user.max_logins }}</p>
             {% endif %}
         </div>
         <form action="{{ url_for('update_amazon_relay') }}" method="post">
@@ -137,13 +138,13 @@
             </div>                          
         </form>
         <form class="form-purchase" action="{{ url_for('pay_subscription', user_id=current_user.id) }}" method="post">
-            <button type="submit">Buy A Plan (${{ monthly_fee }})</button>
+            <button type="submit">Buy A Plan (${{ "%.2f"|format(monthly_fee) }})</button>
         </form>
         <form class="form-purchase" action="{{ url_for('pay_sms_notification',user_id=current_user.id) }}" method="post">
-            <button type="submit">Buy SMS Notification (${{ sms_fee }})</button>
+            <button type="submit">Buy SMS Notification (${{ "%.2f"|format(sms_fee) }})</button>
         </form>
         <form class="form-purchase" action="{{ url_for('pay_extra_login',user_id=current_user.id) }}" method="post">
-            <button type="submit">Buy Extra Login (${{ extra_login_price }})</button>
+            <button type="submit">Buy Extra Login (${{ "%.2f"|format(extra_login_price) }})</button>
         </form>
 
         <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>

@@ -99,7 +99,7 @@
             </div>
             <div class="form-group">
                 <label for="amount">Payment Amount</label>
-                <input type="number" id="amount" name="amount" value="10.00" step="0.01" required>
+                <input type="number" id="amount" name="amount" value="{{ "%.2f"|format(sms_fee) }}" step="0.01" required>
             </div>
             <div class="form-group">
                 <button type="submit">Pay Notification Fee</button>

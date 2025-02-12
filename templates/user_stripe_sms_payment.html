@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stripe Payment</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        #card-element {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Stripe Payment for ${{ "%.2f"|format(amount) }}</h2>
+
+    <form id="payment-form">
+        <label for="name">Name on Card:</label>
+        <input type="text" id="name" required>
+        <br><br>
+
+        <div id="card-element">
+            <!-- Stripe Elements will create this input -->
+        </div>
+        <br>
+
+        <button id="submit-button">Pay ${{ "%.2f"|format(amount) }}</button>
+    </form>
+
+    <div id="payment-result"></div>
+
+    <script>
+        var stripe = Stripe("{{ stripe_public_key }}");
+        var elements = stripe.elements();
+        var cardElement = elements.create('card');
+        cardElement.mount('#card-element');
+
+        document.getElementById("payment-form").addEventListener("submit", async function(event) {
+    event.preventDefault();
+
+    // Get the name on the card
+    let cardholderName = document.getElementById("name").value;
+
+    // Create a Stripe payment method
+    let { paymentMethod, error } = await stripe.createPaymentMethod({
+        type: "card",
+        card: cardElement,
+        billing_details: { name: cardholderName }
+    });
+
+    if (error) {
+        document.getElementById("payment-result").innerText = error.message;
+        return;
+    }
+
+    // Send the payment details to the server
+    try {
+        let response = await fetch("{{ url_for('charge_sms', user_id=user_id) }}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                payment_method_id: paymentMethod.id,
+                amount: parseFloat("{{ amount }}")  // Convert to number
+            })
+        });
+
+        let data = await response.json();
+
+        // Display success/error message
+        let resultDiv = document.getElementById("payment-result");
+        resultDiv.innerText = data.message;
+
+        if (data.success) {
+            resultDiv.style.color = "green";  // Show success message in green
+            setTimeout(() => {
+                window.location.href = "{{ url_for('user_dashboard') }}";
+            }, 2000);
+        } else {
+            resultDiv.style.color = "red";  // Show error message in red
+        }
+    } catch (fetchError) {
+        console.error("Payment error:", fetchError);
+        document.getElementById("payment-result").innerText = "Payment processing failed. Try again.";
+    }
+});
+
+    </script>
+</body>
+</html>

@@ -159,6 +159,12 @@ def get_extra_login_price():
 def set_extra_login_price(price):
     set_config_value("EXTRA_LOGIN_PRICE", str(price))
 
+def get_sms_price():
+    return float(get_config_value("SMS_PRICE") or 10.00)  # Default to $10
+
+def set_sms_price(price):
+    set_config_value("SMS_PRICE", str(price))
+
 def get_config_value(key_name):
     config = Config.query.filter_by(key_name=key_name).first()
     return config.key_value if config else None
@@ -619,6 +625,22 @@ def update_login_price():
 
     return redirect(url_for("admin_dashboard"))
 
+@app.route("/admin/update_sms_price", methods=["POST"])
+@login_required
+def update_sms_price():
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    new_price = request.form["sms_price"]
+    try:
+        set_sms_price(round(float(new_price),2))
+        flash("Extra login price updated successfully!", "success")
+    except ValueError:
+        flash("Invalid price entered.", "error")
+
+    return redirect(url_for("admin_dashboard"))
+
 @app.route("/purchase_extra_login", methods=["GET", "POST"])
 @login_required
 def purchase_extra_login():
@@ -697,7 +719,7 @@ def admin_dashboard():
         return redirect(url_for('login'))
     users = User.query.all()
     now = datetime.utcnow().date()
-    return render_template('admin_dashboard.html', users=users,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price())
+    return render_template('admin_dashboard.html', users=users,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
 
 @app.route('/user_dashboard')
 @login_required
@@ -709,7 +731,7 @@ def user_dashboard():
         flash('Access restricted. Please contact the admin to make a payment.', 'error')
         return redirect(url_for('login'))
     now = datetime.utcnow().date()
-    return render_template('user_dashboard.html',users=current_user,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=10.0)
+    return render_template('user_dashboard.html',users=current_user,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -830,28 +852,12 @@ def process_payment(user_id):
     flash("Invalid payment method selected", "error")
     return redirect(url_for('admin_dashboard'))
 
+# pay_subscription
 @app.route('/user/pay_subscription/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def pay_subscription(user_id):
-    # if current_user.role != 'admin':
-    #     flash('Unauthorized access!', 'error')
-    #     return redirect(url_for('dashboard'))
-
     user = User.query.get_or_404(user_id)
-    # if request.method == 'POST':
-    #     payment_method = request.form['payment_method']
-    #     amount = float(request.form.get('amount', 30.0))
-
-    #     user.is_paid = True
-    #     user.payment_due_date = datetime.utcnow() + timedelta(days=30)
-    #     payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method)
-    #     db.session.add(payment)
-    #     db.session.commit()
-
-    #     flash(f"Payment of ${amount} recorded for {user.username}. Next payment due on {user.payment_due_date.strftime('%Y-%m-%d')}.", 'success')
-    #     return redirect(url_for('admin_dashboard'))
-
-    return render_template('payment_subscription.html', user=user)
+    return render_template('payment_subscription.html', user=user, monthly_fee=get_monthly_fee())
 
 @app.route("/user/process_subscription_payment/<int:user_id>", methods=["POST"])
 @login_required
@@ -862,7 +868,7 @@ def process_subscription_payment(user_id):
         return redirect(url_for('user_dashboard'))
 
     payment_method = request.form.get('payment_method')
-    amount = float(request.form.get('amount', 0))
+    amount = round(float(request.form.get('amount', 0)))
 
     if payment_method in ['cash', 'check']:
         user.is_paid = True
@@ -878,16 +884,63 @@ def process_subscription_payment(user_id):
             flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
             return redirect(url_for('user_dashboard'))
 
-        return redirect(url_for('user_stripe_payment', user_id=user.id, amount=amount))
+        return redirect(url_for('user_stripe_payment_subscription', user_id=user.id, amount=amount))
 
     flash("Invalid payment method selected", "error")
     return redirect(url_for('user_dashboard'))
 
+@app.route('/user_stripe_payment_subscription/<int:user_id>/<float:amount>')
+def user_stripe_payment_subscription(user_id, amount):
+    user = User.query.get(user_id)
+    stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
+    if not user or not user.stripe_enabled:
+        flash("User not found or Stripe not enabled", "error")
+        return redirect(url_for('user_dashboard'))
+
+    return render_template("user_stripe_payment_subscription.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
+
+@app.route('/charge_subscription/<int:user_id>', methods=['POST'])
+def charge_subscription(user_id):
+    stripe.api_key = get_config_value("STRIPE_SECRET_KEY")
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 400
+
+    data = request.get_json()
+    payment_method_id = data.get("payment_method_id")
+    amount = float(data.get("amount", 0)) * 100  # Convert to cents
+
+    try:
+        # Create a payment intent with redirect disabled
+        intent = stripe.PaymentIntent.create(
+            amount=int(amount),
+            currency="usd",
+            payment_method=payment_method_id,
+            confirm=True,
+            automatic_payment_methods={
+                "enabled": True,
+                "allow_redirects": "never"  # Disable redirect-based methods
+            }
+        )
+
+        # Save successful payment
+        user.is_paid = True
+        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+        payment = Payment(user_id=user.id, amount=amount / 100, payment_method="card", status="success")
+        db.session.add(payment)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Payment successful!"})
+
+    except stripe.error.StripeError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+# Pay SMS Notification
 @app.route('/user/pay_sms_notification/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def pay_sms_notification(user_id):
     user = User.query.get_or_404(user_id)
-    return render_template('pay_sms_notification.html', user=user)
+    return render_template('pay_sms_notification.html', user=user,sms_fee=get_sms_price())
 
 @app.route("/user/process_sms_payment/<int:user_id>", methods=["POST"])
 @login_required
@@ -901,8 +954,6 @@ def process_sms_payment(user_id):
     amount = float(request.form.get('amount', 0))
 
     if payment_method in ['cash', 'check']:
-        user.is_paid = True
-        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
         db.session.add(payment)
         db.session.commit()
@@ -914,16 +965,61 @@ def process_sms_payment(user_id):
             flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
             return redirect(url_for('user_dashboard'))
 
-        return redirect(url_for('user_stripe_payment', user_id=user.id, amount=amount))
+        return redirect(url_for('user_stripe_sms_payment', user_id=user.id, amount=amount))
 
     flash("Invalid payment method selected", "error")
     return redirect(url_for('user_dashboard'))
 
+@app.route('/user_stripe_sms_payment/<int:user_id>/<float:amount>')
+def user_stripe_sms_payment(user_id, amount):
+    user = User.query.get(user_id)
+    stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
+    if not user or not user.stripe_enabled:
+        flash("User not found or Stripe not enabled", "error")
+        return redirect(url_for('user_dashboard'))
+
+    return render_template("user_stripe_sms_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
+
+@app.route('/charge_sms/<int:user_id>', methods=['POST'])
+def charge_sms(user_id):
+    stripe.api_key = get_config_value("STRIPE_SECRET_KEY")
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 400
+
+    data = request.get_json()
+    payment_method_id = data.get("payment_method_id")
+    amount = float(data.get("amount", 0)) * 100  # Convert to cents
+
+    try:
+        # Create a payment intent with redirect disabled
+        intent = stripe.PaymentIntent.create(
+            amount=int(amount),
+            currency="usd",
+            payment_method=payment_method_id,
+            confirm=True,
+            automatic_payment_methods={
+                "enabled": True,
+                "allow_redirects": "never"  # Disable redirect-based methods
+            }
+        )
+
+        # Save successful payment
+        payment = Payment(user_id=user.id, amount=amount / 100, payment_method="card", status="success")
+        db.session.add(payment)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Payment successful!"})
+
+    except stripe.error.StripeError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+# Payment extra login
 @app.route('/user/pay_extra_login/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def pay_extra_login(user_id):
     user = User.query.get_or_404(user_id)
-    return render_template('pay_extra_login.html', user=user)
+    return render_template('pay_extra_login.html', user=user,extra_login_price=get_extra_login_price())
 
 @app.route("/user/process_extra_login_payment/<int:user_id>", methods=["POST"])
 @login_required
@@ -937,8 +1033,7 @@ def process_extra_login_payment(user_id):
     amount = float(request.form.get('amount', 0))
 
     if payment_method in ['cash', 'check']:
-        user.is_paid = True
-        user.payment_due_date = datetime.utcnow() + timedelta(days=30)
+        user.max_logins += 1
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
         db.session.add(payment)
         db.session.commit()
@@ -950,10 +1045,55 @@ def process_extra_login_payment(user_id):
             flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
             return redirect(url_for('user_dashboard'))
 
-        return redirect(url_for('user_stripe_payment', user_id=user.id, amount=amount))
+        return redirect(url_for('user_stripe_extra_login_payment', user_id=user.id, amount=amount))
 
     flash("Invalid payment method selected", "error")
     return redirect(url_for('user_dashboard'))
+
+@app.route('/user_stripe_extra_login_payment/<int:user_id>/<float:amount>')
+def user_stripe_extra_login_payment(user_id, amount):
+    user = User.query.get(user_id)
+    stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
+    if not user or not user.stripe_enabled:
+        flash("User not found or Stripe not enabled", "error")
+        return redirect(url_for('user_dashboard'))
+
+    return render_template("user_stripe_extra_login_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
+
+@app.route('/charge_extra_login/<int:user_id>', methods=['POST'])
+def charge_extra_login(user_id):
+    stripe.api_key = get_config_value("STRIPE_SECRET_KEY")
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 400
+
+    data = request.get_json()
+    payment_method_id = data.get("payment_method_id")
+    amount = float(data.get("amount", 0)) * 100  # Convert to cents
+
+    try:
+        # Create a payment intent with redirect disabled
+        intent = stripe.PaymentIntent.create(
+            amount=int(amount),
+            currency="usd",
+            payment_method=payment_method_id,
+            confirm=True,
+            automatic_payment_methods={
+                "enabled": True,
+                "allow_redirects": "never"  # Disable redirect-based methods
+            }
+        )
+
+        # Save successful payment
+        user.max_logins += 1
+        payment = Payment(user_id=user.id, amount=amount / 100, payment_method="card", status="success")
+        db.session.add(payment)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Payment successful!"})
+
+    except stripe.error.StripeError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
 
 @app.route('/stripe_payment/<int:user_id>/<float:amount>')
 def stripe_payment(user_id, amount):
@@ -965,15 +1105,7 @@ def stripe_payment(user_id, amount):
 
     return render_template("stripe_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
 
-@app.route('/user_stripe_payment/<int:user_id>/<float:amount>')
-def user_stripe_payment(user_id, amount):
-    user = User.query.get(user_id)
-    stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
-    if not user or not user.stripe_enabled:
-        flash("User not found or Stripe not enabled", "error")
-        return redirect(url_for('user_dashboard'))
 
-    return render_template("user_stripe_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
 
 @app.route('/charge/<int:user_id>', methods=['POST'])
 def charge(user_id):
@@ -1089,9 +1221,10 @@ def toggle_sms_opt_in(user_id):
 
     if not user.sms_opt_in:
         # Calculate prorated fee
-        prorated_fee = round((days_remaining / days_in_month) * 10, 2) if days_remaining > 0 else 10.00
+        prorated_fee = round((days_remaining / days_in_month) * get_sms_price(), 2) if days_remaining > 0 else get_sms_price()
         user.sms_fee_due = prorated_fee
         user.sms_opt_in = True
+        user.notification= True
         flash(f"SMS alerts enabled. Prorated fee: ${prorated_fee}. Please proceed to payment.", "success")
     else:
         user.sms_opt_in = False
