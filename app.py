@@ -954,6 +954,7 @@ def process_sms_payment(user_id):
     amount = float(request.form.get('amount', 0))
 
     if payment_method in ['cash', 'check']:
+        user.notifications = True
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
         db.session.add(payment)
         db.session.commit()
@@ -1005,6 +1006,7 @@ def charge_sms(user_id):
         )
 
         # Save successful payment
+        user.notifications = True
         payment = Payment(user_id=user.id, amount=amount / 100, payment_method="card", status="success")
         db.session.add(payment)
         db.session.commit()
