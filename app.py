@@ -1228,7 +1228,7 @@ def toggle_sms_opt_in(user_id):
         flash(f"SMS alerts enabled. Prorated fee: ${prorated_fee}. Please proceed to payment.", "success")
     else:
         user.sms_opt_in = False
-        user.sms_fee_due = 0.0
+        user.notifications= False
         flash("SMS alerts disabled.", "success")
 
     db.session.commit()
