@@ -1224,7 +1224,7 @@ def toggle_sms_opt_in(user_id):
         prorated_fee = round((days_remaining / days_in_month) * get_sms_price(), 2) if days_remaining > 0 else get_sms_price()
         user.sms_fee_due = prorated_fee
         user.sms_opt_in = True
-        user.notification= True
+        user.notifications= True
         flash(f"SMS alerts enabled. Prorated fee: ${prorated_fee}. Please proceed to payment.", "success")
     else:
         user.sms_opt_in = False
