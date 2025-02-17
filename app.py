@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request, flash,session,current_app,jsonify
 from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
@@ -436,38 +437,36 @@ def register():
 @app.route('/send_verification_email', methods=['GET','POST'])
 @login_required
 def send_verification_email():
+    if current_user.email_verified:
+        return jsonify({"message": "Email already verified."}), 400
+    
     token = str(uuid.uuid4())
     current_user.verification_token = token
     db.session.commit()
-    if request.method == 'POST':
-        # Load SMTP settings from database
-        smtp_settings = get_smtp_settings()
-        if not smtp_settings:
-            flash("❌ SMTP settings not configured!", "error")
-            return redirect(url_for("update_smtp_settings"))
-
-        # Update Flask-Mail config
-        current_app.config.update(
-            MAIL_SERVER=smtp_settings["MAIL_SERVER"],
-            MAIL_PORT=smtp_settings["MAIL_PORT"],
-            MAIL_USERNAME=smtp_settings["MAIL_USERNAME"],
-            MAIL_PASSWORD=smtp_settings["MAIL_PASSWORD"],
-            MAIL_USE_TLS=smtp_settings["MAIL_USE_TLS"],
-            MAIL_USE_SSL=smtp_settings["MAIL_USE_SSL"],
-            MAIL_DEFAULT_SENDER=smtp_settings["MAIL_DEFAULT_SENDER"],
-        )
+    smtp_settings = get_smtp_settings()
+    # Update Flask-Mail config
+    current_app.config.update(
+        MAIL_SERVER=smtp_settings["MAIL_SERVER"],
+        MAIL_PORT=smtp_settings["MAIL_PORT"],
+        MAIL_USERNAME=smtp_settings["MAIL_USERNAME"],
+        MAIL_PASSWORD=smtp_settings["MAIL_PASSWORD"],
+        MAIL_USE_TLS=smtp_settings["MAIL_USE_TLS"],
+        MAIL_USE_SSL=smtp_settings["MAIL_USE_SSL"],
+        MAIL_DEFAULT_SENDER=smtp_settings["MAIL_DEFAULT_SENDER"],
+    )
         
-        mail = Mail(current_app)
-        verification_link = url_for('verify_email', token=token, _external=True)
-        message = Message(
-            'Email Verification',
-            recipients=[current_user.email],
-            body=f'Click the link to verify your email: {verification_link}'
-        )
-        mail.send(message)
+    mail = Mail(current_app)
+    verification_link = url_for('verify_email', token=token, _external=True)
+    message = Message(
+        'Email Verification',
+        recipients=[current_user.email],
+        body=f'Click the link to verify your email: {verification_link}'
+    )
+    mail.send(message)
 
-        flash('Verification email sent. Please check your inbox.', 'success')
-    return redirect(url_for('user_dashboard'))
+    # flash('Verification email sent. Please check your inbox.', 'success')
+    # return redirect(url_for('user_dashboard'))
+    return jsonify({"message": "Verification email sent! Check your inbox."})
 
 @app.route('/verify_email/<token>')
 def verify_email(token):

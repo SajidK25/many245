@@ -108,11 +108,17 @@
         <div class="user-info">
             <p><strong>Role:</strong> {{ current_user.role }}</p>
             <p><strong>Email:</strong> {{ current_user.email }} 
-            {% if not current_user.is_verified %}
-            <a href="{{ url_for('send_verification_email') }}" class="btn btn-warning">Verify Email</a>
-            {% else %}
-                <p>✅ Email Verified</p>
-            {% endif %}</p>
+            <button id="verify-email-btn" onclick="sendVerificationEmail()"
+                {% if current_user.email_verified %} disabled style="background-color: green; color: white;" {% endif %}>
+                {% if current_user.email_verified %}
+                    ✅ Email Verified
+                {% else %}
+                    Verify Email
+                {% endif %}
+            </button>
+
+            <p id="verification-message" class="text-warning bg-dark"></p>
+
             <p><strong>Phone Number:</strong> {{ current_user.phone_number }}</p>
             <p><strong>Notifications:</strong> {% if current_user.notifications %}Enabled{% else %}Disabled{% endif %}</p>
             <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
@@ -171,5 +177,17 @@
 
         <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
     </div>
+    <script>
+        function sendVerificationEmail() {
+            fetch("{{ url_for('send_verification_email') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("verification-message").innerText = data.message;
+            });
+        }
+    </script>
 </body>
 </html>
