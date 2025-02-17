@@ -106,7 +106,7 @@
 <body>
     <div class="dashboard-container">
         <h1>Admin Dashboard</h1>
-        <div class="flash-messages"><div class="flash-messages">
+        <div class="flash-messages">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -122,20 +122,6 @@
                 {% endif %}
             {% endwith %}
         </div>
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        {% if category == 'error' %}
-                            {% set category = 'danger' %}
-                        {% elif category == 'message' %}
-                            {% set category = 'info' %}
-                        {% endif %}
-                        <div class="alert alert-{{ category }}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
         </div>
         <table class="users-table">
             <thead>
