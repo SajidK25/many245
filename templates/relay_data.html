@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Relay Data Viewer</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        .filter-container { margin-bottom: 20px; background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .filter-container input, .filter-container select { padding: 10px; margin: 5px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .search-btn { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .search-btn:hover { background-color: #45a049; }
+
+        /* Color Alert Styles */
+        .late { background-color: #f8d7da; color: #721c24; } /* Red */
+        .on-time { background-color: #d4edda; color: #155724; } /* Green */
+        .bobtail { background-color: #fff3cd; color: #856404; } /* Orange */
+    </style>
+</head>
+<body>
+
+    <h1>Amazon Relay Data Viewer</h1>
+
+    <!-- FILTER FORM -->
+    <div class="filter-container">
+        <h3>Search & Filter</h3>
+        <form id="searchForm" method="GET" action="{{ url_for('relay_data') }}">
+            <input type="text" name="contract_id" placeholder="Search by Contract ID">
+            <input type="text" name="load_id" placeholder="Search by Load ID">
+            <input type="text" name="driver_name" placeholder="Driver Name">
+            <select name="alert_type">
+                <option value="">Select Alert Type</option>
+                <option value="sms">SMS</option>
+                <option value="email">Email</option>
+                <option value="push">Push Notification</option>
+            </select>
+            <button type="submit" class="search-btn">Search</button>
+        </form>
+    </div>
+
+    <!-- DATA TABLE -->
+    <table>
+        <thead>
+            <tr>
+                <th>Contract ID</th>
+                <th>Load ID</th>
+                <th>From-To</th>
+                <th>Driver Name</th>
+                <th>Load Type</th>
+                <th>Create Time</th>
+                <th>Status</th>
+                <th>Arrival/Departure Time</th>
+                <th>Tab Name</th>
+                <th>Alert</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in relay_data %}
+            <tr class="
+                {% if item.status == 'Late' %}late
+                {% elif item.status == 'On-Time' %}on-time
+                {% elif item.loadType == 'bobtail' %}bobtail
+                {% endif %}">
+                <td>{{ item.contract_id }}</td>
+                <td>{{ item.load_id }}</td>
+                <td>{{ item.from_to }}</td>
+                <td>{{ item.driver_name }}</td>
+                <td>{{ item.loadType }}</td>
+                <td>{{ item.createTime }}</td>
+                <td>{{ item.status }}</td>
+                <td>{{ item.arrival_departure_time }}</td>
+                <td>{{ item.tabname }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('send_alert') }}">
+                        <input type="hidden" name="load_id" value="{{ item.load_id }}">
+                        <select name="alert_type">
+                            <option value="sms">SMS</option>
+                            <option value="email">Email</option>
+                            <option value="push">Push</option>
+                        </select>
+                        <button type="submit">Send Alert</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>

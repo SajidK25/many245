@@ -1,0 +1,62 @@
+this will be added to app.py
+
+
+from flask import Flask, render_template, request, redirect, url_for, flash
+from models import db, RelayData
+import smtplib
+import requests
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key'
+
+@app.route('/relay_data', methods=['GET', 'POST'])
+def relay_data():
+    search_filters = {
+        'contract_id': request.args.get('contract_id'),
+        'load_id': request.args.get('load_id'),
+        'driver_name': request.args.get('driver_name'),
+    }
+
+    query = RelayData.query
+
+    for field, value in search_filters.items():
+        if value:
+            query = query.filter(getattr(RelayData, field).ilike(f"%{value}%"))
+
+    filtered_data = query.all()
+
+    return render_template("relay_data.html", relay_data=filtered_data)
+
+@app.route('/send_alert', methods=['POST'])
+def send_alert():
+    load_id = request.form.get('load_id')
+    alert_type = request.form.get('alert_type')
+
+    # Fetch load data
+    load_data = RelayData.query.filter_by(load_id=load_id).first()
+
+    # Handle Alerts
+    if alert_type == 'sms':
+        send_sms(f"ALERT: Issue with Load {load_id} - {load_data.status}")
+    elif alert_type == 'email':
+        send_email("Load Alert", f"ALERT: Issue with Load {load_id} - {load_data.status}")
+    elif alert_type == 'push':
+        send_push_notification(f"ALERT: Issue with Load {load_id} - {load_data.status}")
+
+    flash(f"{alert_type.upper()} Alert Sent for Load {load_id}", "success")
+    return redirect(url_for('relay_data'))
+
+def send_sms(message):
+    # Example: Integrate with Twilio or VoIP.ms
+    print("Sending SMS:", message)
+
+def send_email(subject, body):
+    # Example: Use Flask-Mail or SMTP here
+    print("Sending Email:", subject, body)
+
+def send_push_notification(message):
+    # Example: Push notification logic here
+    print("Sending Push Notification:", message)
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Relay Data Viewer</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        .filter-container { margin-bottom: 20px; background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .filter-container input, .filter-container select { padding: 10px; margin: 5px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .search-btn { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .search-btn:hover { background-color: #45a049; }
+    </style>
+</head>
+<body>
+
+    <h1>Amazon Relay Data Viewer</h1>
+
+    <!-- FILTER FORM -->
+    <div class="filter-container">
+        <h3>Search & Filter</h3>
+        <form id="searchForm" method="GET" action="{{ url_for('relay_data') }}">
+            <input type="text" name="contract_id" placeholder="Search by Contract ID">
+            <input type="text" name="load_id" placeholder="Search by Load ID">
+            <input type="text" name="from_to" placeholder="From-To Location">
+            <input type="text" name="driver_name" placeholder="Driver Name">
+            <input type="text" name="loadType" placeholder="Load Type">
+            <input type="text" name="status" placeholder="Status">
+            <input type="text" name="tabname" placeholder="Tab Name">
+            <button type="submit" class="search-btn">Search</button>
+        </form>
+    </div>
+
+    <!-- DATA TABLE -->
+    <table>
+        <thead>
+            <tr>
+                <th>Contract ID</th>
+                <th>Load ID</th>
+                <th>From-To</th>
+                <th>Driver Name</th>
+                <th>Load Type</th>
+                <th>Create Time</th>
+                <th>Status</th>
+                <th>Planned Arrival Stop 1</th>
+                <th>Actual Arrival Stop 1</th>
+                <th>Planned Departure Stop 1</th>
+                <th>Actual Departure Stop 1</th>
+                <th>Planned Arrival Stop 2</th>
+                <th>Actual Arrival Stop 2</th>
+                <th>Planned Departure Stop 2</th>
+                <th>Actual Departure Stop 2</th>
+                <th>Actual Stats</th>
+                <th>Arrival/Departure Time</th>
+                <th>Tab Name</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in relay_data %}
+            <tr>
+                <td>{{ item.contract_id }}</td>
+                <td>{{ item.load_id }}</td>
+                <td>{{ item.from_to }}</td>
+                <td>{{ item.driver_name }}</td>
+                <td>{{ item.loadType }}</td>
+                <td>{{ item.createTime }}</td>
+                <td>{{ item.status }}</td>
+                <td>{{ item.planned_arrival_stop1 }}</td>
+                <td>{{ item.actual_arrival_stop1 }}</td>
+                <td>{{ item.planned_Departure_stop1 }}</td>
+                <td>{{ item.actual_Departure_stop1 }}</td>
+                <td>{{ item.planned_arrival_stop2 }}</td>
+                <td>{{ item.actual_arrival_stop2 }}</td>
+                <td>{{ item.planned_Departure_stop2 }}</td>
+                <td>{{ item.actual_Departure_stop2 }}</td>
+                <td>{{ item.actual_stats }}</td>
+                <td>{{ item.arrival_departure_time }}</td>
+                <td>{{ item.tabname }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>

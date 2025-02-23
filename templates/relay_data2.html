@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Relay Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        .filter-container { margin-bottom: 20px; background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .filter-container input, .filter-container select { padding: 10px; margin: 5px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .search-btn { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .search-btn:hover { background-color: #45a049; }
+    </style>
+</head>
+<body>
+
+    <h1>Amazon Relay Data Viewer</h1>
+
+    <!-- FILTER FORM -->
+    <div class="filter-container">
+        <h3>Search & Filter</h3>
+        <form id="searchForm" method="GET" action="{{ url_for('relay_data') }}">
+            <input type="text" name="id" placeholder="Search by ID">
+            <input type="text" name="location" placeholder="Search by Location">
+            <input type="text" name="driver" placeholder="Search by Driver">
+            <input type="text" name="domicile" placeholder="Search by Domicile">
+            <input type="text" name="disruption" placeholder="Search by Disruption">
+            
+            <select name="work_type">
+                <option value="">Select Work Type</option>
+                <option value="local">Local</option>
+                <option value="long-haul">Long-Haul</option>
+                <option value="short-haul">Short-Haul</option>
+            </select>
+
+            <select name="program">
+                <option value="">Select Program</option>
+                <option value="amazon-freight">Amazon Freight</option>
+                <option value="relay">Relay</option>
+                <option value="dedicated">Dedicated</option>
+            </select>
+
+            <button type="submit" class="search-btn">Search</button>
+        </form>
+    </div>
+
+    <!-- DATA TABLE -->
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Location</th>
+                <th>Driver</th>
+                <th>Domicile</th>
+                <th>Disruption</th>
+                <th>Work Type</th>
+                <th>Program</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in relay_data %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.location }}</td>
+                <td>{{ item.driver }}</td>
+                <td>{{ item.domicile }}</td>
+                <td>{{ item.disruption }}</td>
+                <td>{{ item.work_type }}</td>
+                <td>{{ item.program }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>
