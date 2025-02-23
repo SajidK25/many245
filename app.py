@@ -7,6 +7,9 @@ from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired, BadTimeSignature,BadSignature
 from flask_mail import Mail, Message
+from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config
+from api import api_bp
+from utils import log_action
 import os
 import stripe
 import uuid
@@ -27,105 +30,14 @@ app.config['SECRET_KEY'] = 'sample_secret_key_123456'
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 bcrypt = Bcrypt(app)
 mail = Mail(app)
+app.register_blueprint(api_bp)
 
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False, name="uq_user_username")  # Named unique constraint
-    email = db.Column(db.String(120), unique=True, nullable=False, name="uq_user_email")  # Named unique constraint
-    phone_number = db.Column(db.String(15), unique=True, nullable=True, name="uq_user_phone_number")  # Named unique constraint
-    notifications = db.Column(db.Boolean, default=False)
-    password = db.Column(db.String(60), nullable=False)
-    max_logins = db.Column(db.Integer, default=1)  # Default to 1 active login
-    active_tokens = db.relationship('LoginToken', backref='user', lazy=True)
-    active_sessions = db.relationship('LoginSession', backref='user', lazy=True)
-    role = db.Column(db.String(10), nullable=False, default='user')
-    is_paid = db.Column(db.Boolean, default=False)
-    payment_status = db.Column(db.String(20), default="Unpaid")
-    payment_due_date = db.Column(db.Date, nullable=True)
-    stripe_enabled = db.Column(db.Boolean, default=False)
-    email_verified = db.Column(db.Boolean, default=False)
-    verification_token = db.Column(db.String(100), nullable=True)
-    amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")  # Named unique constraint
-    amazon_relay_password = db.Column(db.String(60), nullable=True)
-    sms_opt_in = db.Column(db.Boolean, default=False)  # Track if SMS alerts are enabled
-    sms_fee_due = db.Column(db.Float, default=0.0)  # Track the prorated amount
-    def set_password(self, password):
-        self.password = bcrypt.generate_password_hash(password).decode('utf-8')
-
-    def check_password(self, password):
-        return bcrypt.check_password_hash(self.password, password)
-
-    def set_amazon_relay_password(self, password):
-        self.amazon_relay_password = bcrypt.generate_password_hash(password).decode('utf-8')
-
-    def check_amazon_relay_password(self, password):
-        return bcrypt.check_password_hash(self.amazon_relay_password, password)
-    # Generate a password reset token
-    def get_reset_token(self, expires_sec=1800):
-        s = Serializer(current_app.config['SECRET_KEY'])
-        return s.dumps({'email': self.email})
-    # Verify the reset token
-    @staticmethod
-    def verify_reset_token(token):
-        s = Serializer(current_app.config['SECRET_KEY'])
-        try:
-            email = s.loads(token, max_age=1800)['email']
-        except:
-            return None
-        # return User.query.get(email)
-        return email
-
-
-class LoginToken(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    token = db.Column(db.String(255), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-class LoginSession(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    session_token = db.Column(db.String(255), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)# Generate a password reset token
-
-class Payment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    amount = db.Column(db.Float, nullable=False, default=30.0)
-    date = db.Column(db.DateTime, default=datetime.utcnow)
-    payment_method = db.Column(db.String(20), nullable=False)  # 'cash', 'check', 'credit_card'
-    status = db.Column(db.String(20), nullable=False)
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-
-class Config(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    key_name = db.Column(db.String(50), unique=True, nullable=False)
-    key_value = db.Column(db.String(255), nullable=False)
-
-class VoipSettings(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    api_username = db.Column(db.String(255), nullable=False)
-    api_password = db.Column(db.String(255), nullable=False)
-    api_did = db.Column(db.Integer, nullable=False)
-    api_url = db.Column(db.String(255), nullable=False)
-    sms_enabled = db.Column(db.Boolean, default=False)
-    sms_fee = db.Column(db.Float, default=0.0)
-
-class SMTPSettings(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    smtp_server = db.Column(db.String(255), nullable=False)
-    smtp_port = db.Column(db.Integer, nullable=False)
-    smtp_username = db.Column(db.String(255), nullable=False)
-    smtp_password = db.Column(db.String(255), nullable=False)
-    smtp_use_tls = db.Column(db.Boolean, default=True)
-    smtp_use_ssl = db.Column(db.Boolean, default=True)
-    default_sender = db.Column(db.String(255), nullable=True)
 
 def get_smtp_settings():
     settings = SMTPSettings.query.first()
@@ -606,6 +518,7 @@ def login():
 
         session['login_token'] = new_token
         login_user(user)
+        log_action(user.id, "User logged in")
         return redirect(url_for('user_dashboard'))
 
 @app.route("/admin/update_login_price", methods=["POST"])
@@ -691,7 +604,7 @@ def reset_user_sessions(user_id):
 
     LoginSession.query.filter_by(user_id=user_id).delete()
     db.session.commit()
-    
+    log_action(current_user.id, f"Admin reset sessions for user ID {user_id}")
     flash("All sessions for the user have been reset.", "success")
     return redirect(url_for("admin_dashboard"))
 
@@ -704,6 +617,7 @@ def logout():
         db.session.commit()
 
     session.pop('login_token', None)
+    log_action(current_user.id, "User logged out")
     logout_user()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
