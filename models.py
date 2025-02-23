@@ -3,6 +3,7 @@ from flask_bcrypt import Bcrypt
 from flask_login import UserMixin, LoginManager
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from datetime import datetime, timedelta
+import uuid
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
@@ -113,3 +114,11 @@ class HistoryLog(db.Model):
     ip_address = db.Column(db.String(45), nullable=True)  # Track IP addresses
     user_agent = db.Column(db.String(255), nullable=True)  # Track device details
     user = db.relationship('User', backref=db.backref('history_logs', lazy=True))
+
+
+class APIKey(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(64), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref=db.backref('api_keys', lazy=True))
