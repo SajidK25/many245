@@ -604,7 +604,7 @@ def reset_user_sessions(user_id):
 
     LoginSession.query.filter_by(user_id=user_id).delete()
     db.session.commit()
-    
+    log_action(current_user.id, f"Admin reset sessions for user ID {user_id}")
     flash("All sessions for the user have been reset.", "success")
     return redirect(url_for("admin_dashboard"))
 
@@ -617,6 +617,7 @@ def logout():
         db.session.commit()
 
     session.pop('login_token', None)
+    log_action(current_user.id, "User logged out")
     logout_user()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))

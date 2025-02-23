@@ -16,6 +16,14 @@ class LoginAPI(Resource):
         password = data.get("password")
 
         user = User.query.filter_by(username=username).first()
+        if not user or not user.check_password(password):
+            return {"message": "Invalid credentials"}, 401
+            
+        # Admins have unlimited logins
+        # if user.role == "admin":
+        #     login_user(user)
+        #     return {"message": "Admin Login successful!"}, 200
+
         if user and user.check_password(password):
             active_sessions = LoginSession.query.filter_by(user_id=user.id).count()
             if (active_sessions or 0) >= (user.max_logins or 1):
@@ -30,7 +38,6 @@ class LoginAPI(Resource):
             login_user(user)
             return {"message": "Login successful", "token": new_token}, 200
         
-        return {"message": "Invalid credentials"}, 401
 
 class LogoutAPI(Resource):
     def post(self):
@@ -138,9 +145,24 @@ class ProcessPaymentAPI(Resource):
 
 # History Log API
 class HistoryLogAPI(Resource):
-    @login_required
+    # @login_required
     def get(self):
-        if current_user.role != "admin":
+        # Extract token from the Authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return {"message": "Missing or invalid token"}, 401
+        
+        token = auth_header.replace("Bearer ", "").strip()
+
+        # Verify the token in the database
+        login_token = LoginSession.query.filter_by(session_token=token).first()
+        if not login_token:
+            return {"message": "Invalid or expired token"}, 401
+        
+        user = User.query.get(login_token.user_id)
+        if not user:
+            return {"message": "User not found"}, 404
+        if user.role != "admin":
             return {"message": "Unauthorized"}, 401
 
         logs = HistoryLog.query.order_by(HistoryLog.timestamp.desc()).all()
