@@ -442,16 +442,17 @@ def reset_password(token):
 @login_required
 def send_otp():
     otp = random.randint(100000, 999999)
-    current_user.verification_token = str(otp)
+    current_user.phone_verification_token = str(otp)
     db.session.commit()
 
     message = f'Your OTP is: {otp}'
     response = send_sms(current_user.phone_number, message)
 
-    if response.get('status') == 'success':
-        flash('OTP sent to your phone.', 'success')
-    else:
-        flash('Failed to send OTP. Please try again.', 'error')
+    try:
+        send_sms(dest_no, test_sms)
+        flash(f"✅ Test sms sent to {dest_no} successfully!", "success")
+    except Exception as e:
+            flash(f"❌ Failed to send test sms: {str(e)}", "error")
 
     return redirect(url_for('user_dashboard'))
 
@@ -459,8 +460,9 @@ def send_otp():
 @login_required
 def verify_otp():
     otp = request.form['otp']
-    if current_user.verification_token == otp:
-        current_user.verification_token = None
+    if current_user.phone_verification_token == otp:
+        current_user.phone_verification_token = None
+        current_user.phone_verified = True
         db.session.commit()
         flash('Phone number successfully verified!', 'success')
     else:
@@ -764,6 +766,31 @@ def process_payment(user_id):
 
     flash("Invalid payment method selected", "error")
     return redirect(url_for('admin_dashboard'))
+
+# API Keys
+@app.route('/admin/generate_api_key/<int:user_id>', methods=['POST'])
+@login_required
+def generate_api_key(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    new_key = APIKey(user_id=user_id)
+    db.session.add(new_key)
+    db.session.commit()
+
+    flash("New API key generated.", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route('/admin/api_keys')
+@login_required
+def list_api_keys():
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    api_keys = APIKey.query.all()
+    return render_template("api_keys.html", api_keys=api_keys)
 
 # pay_subscription
 @app.route('/user/pay_subscription/<int:user_id>', methods=['GET', 'POST'])

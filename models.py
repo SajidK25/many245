@@ -30,6 +30,8 @@ class User(db.Model, UserMixin):
     stripe_enabled = db.Column(db.Boolean, default=False)
     email_verified = db.Column(db.Boolean, default=False)
     verification_token = db.Column(db.String(100), nullable=True)
+    phone_verified = db.Column(db.Boolean, default=False)
+    phone_verification_token = db.Column(db.String(100), nullable=True)
     amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")  # Named unique constraint
     amazon_relay_password = db.Column(db.String(60), nullable=True)
     sms_opt_in = db.Column(db.Boolean, default=False)  # Track if SMS alerts are enabled

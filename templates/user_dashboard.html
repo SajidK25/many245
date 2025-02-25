@@ -115,11 +115,29 @@
                 {% else %}
                     Verify Email
                 {% endif %}
-            </button>
+            </button></p>
 
             <p id="verification-message" class="text-warning bg-dark"></p>
 
-            <p><strong>Phone Number:</strong> {{ current_user.phone_number }}</p>
+            <p><strong>Phone Number:</strong> {{ current_user.phone_number }}
+            <button id="verify-phone-btn" onclick="sendVerificationOTP()"
+                {% if current_user.phone_verified %} disabled style="background-color: green; color: white;" {% endif %}>
+                {% if current_user.phone_verified %}
+                    ✅ Number Verified
+                {% else %}
+                    Verify Number
+                {% endif %}
+            </button></p>
+
+           <p id="verification-otp" class="text-warning bg-dark"></p>
+           <!-- OTP Verification Form -->
+            {% if not current_user.phone_verified %}
+            <div class="form-group">
+                <label for="otp">Enter OTP:</label>
+                <input type="text" id="otp" name="otp" class="form-control" placeholder="Enter OTP" required>
+                <button onclick="verifyOTP()">Verify OTP</button>
+            </div>
+            {% endif %}
             <p><strong>Notifications:</strong> {% if current_user.notifications %}Enabled{% else %}Disabled{% endif %}</p>
             <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
             {% if current_user.payment_due_date %}
@@ -186,6 +204,36 @@
             .then(response => response.json())
             .then(data => {
                 document.getElementById("verification-message").innerText = data.message;
+            });
+        }
+    </script>
+    <script>
+        function sendVerificationOTP() {
+            fetch("{{ url_for('send_otp') }}", {
+                method: "POST"
+            })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("verification-otp").innerText = "OTP sent successfully! Check your phone.";
+            })
+            .catch(error => {
+                document.getElementById("verification-otp").innerText = "Failed to send OTP.";
+            });
+        }
+
+        function verifyOTP() {
+            const otpValue = document.getElementById("otp").value;
+            fetch("{{ url_for('verify_otp') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "otp=" + encodeURIComponent(otpValue)
+            })
+            .then(response => response.text())
+            .then(data => {
+                location.reload();
+            })
+            .catch(error => {
+                alert("OTP verification failed");
             });
         }
     </script>
