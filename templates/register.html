@@ -72,8 +72,9 @@
     </style>
 </head>
 <body>
-    <div class="register-container">
-        <h1>Register</h1>
+   <div class="container mt-4 d-flex justify-content-center align-items-center" style="height: 100vh;">
+    <div class="card shadow p-4 " style="width: 400px;">
+        <h3 class="text-center mb-4">Register</h3>
         <div class="flash-messages">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -92,35 +93,35 @@
         </div>
 
         <form action="{{ url_for('register') }}" method="post">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" placeholder="Enter your username" required>
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" id="username" class="form-control" name="username" placeholder="Enter your username" required>
             </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" class="form-control" name="password" placeholder="Enter your password" required>
             </div>
-            <div class="form-group">
-                <label for="email">Email</label>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
                 <input type="email" name="email" id="email" class="form-control" required>
             </div>
-            <div class="form-group">
-                <label for="phone_number">Phone Number</label>
+            <div class="mb-3">
+                <label for="phone_number" class="form-label">Phone Number</label>
                 <input type="text" name="phone_number" id="phone_number" class="form-control">
             </div>
-            <div class="form-group">
-                <label for="amazon_relay_email">Amazon Relay Email</label>
-                <input type="email" id="amazon_relay_email" name="amazon_relay_email" placeholder="Enter your Amazon Relay email (optional)">
+            <div class="mb-3">
+                <label for="amazon_relay_email" class="form-label">Amazon Relay Email</label>
+                <input type="email" id="amazon_relay_email" class="form-control" name="amazon_relay_email" placeholder="Enter your Amazon Relay email (optional)">
             </div>
-            <div class="form-group">
-                <label for="amazon_relay_password">Amazon Relay Password</label>
-                <input type="password" id="amazon_relay_password" name="amazon_relay_password" placeholder="Enter your Amazon Relay password (optional)">
+            <div class="mb-3">
+                <label for="amazon_relay_password" class="form-label">Amazon Relay Password</label>
+                <input type="password" id="amazon_relay_password" class="form-control" name="amazon_relay_password" placeholder="Enter your Amazon Relay password (optional)">
             </div>
-            <div class="form-group">
-                <button type="submit">Register</button>
+            <div class="mb-3">
+                <button type="submit" class="btn btn-success w-100">Register</button>
             </div>
         </form>
-        <a href="{{ url_for('login') }}" class="login-link">Already have an account? Login here</a>
+        <a href="{{ url_for('login') }}" class="btn btn-secondary w-100 mt-3">Already have an account? Login here</a>
     </div>
 </body>
 </html>

@@ -1,64 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <title>Update SMTP Settings</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f4f4f9;
-        }
-        .container {
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 500px;
-        }
-        h2 {
-            text-align: center;
-        }
-        label {
-            font-weight: bold;
-            display: block;
-            margin-top: 10px;
-        }
-        input {
-            width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            margin-top: 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-    </style>
-</head>
-<body>
+{% extends 'base.html' %}
 
-    <div class="dashboard-container">
-        <h2>Update SMTP Settings</h2>
+{% block title %}Update SMTP Settings{% endblock %}
 
+{% block content %}
+<div class="container mt-4 d-flex justify-content-center align-items-center" style="height: 100vh;">
+    <div class="card shadow p-4 " style="width: 400px;">
+        <h3 class="text-center mb-4">Update SMTP Settings Fee</h3>
         <div class="flash-messages">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -75,33 +22,40 @@
                 {% endif %}
             {% endwith %}
         </div>
-
         <form action="{{ url_for('update_smtp_settings') }}" method="post">
-            <label for="smtp_server">SMTP Server</label>
-            <input type="text" id="smtp_server" name="smtp_server" value="{{ settings.smtp_server }}" required>
-
-            <label for="smtp_port">SMTP Port</label>
-            <input type="number" id="smtp_port" name="smtp_port" value="{{ settings.smtp_port }}" required>
-
-            <label for="smtp_username">SMTP Username</label>
-            <input type="text" id="smtp_username" name="smtp_username" value="{{ settings.smtp_username }}" required>
-
-            <label for="smtp_password">SMTP Password</label>
-            <input type="password" id="smtp_password" name="smtp_password" value="{{ settings.smtp_password }}" required>
-
-            <label for="default_sender">Default Email</label>
-            <input type="email" id="default_sender" name="default_sender" value="{{ settings.default_sender }}" required>
-
-            <label for="smtp_use_tls">Use TLS</label>
-            <input type="checkbox" id="smtp_use_tls" name="smtp_use_tls" {% if settings.smtp_use_tls %}checked{% endif %}>
-
-            <label for="smtp_use_ssl">Use SSL</label>
-            <input type="checkbox" id="smtp_use_ssl" name="smtp_use_ssl" {% if settings.smtp_use_ssl %}checked{% endif %}>
-            <button type="submit">Save Settings</button>
+            <div class="mb-3">
+            <label for="smtp_server" class="form-label">SMTP Server</label>
+            <input type="text" id="smtp_server" class="form-control" name="smtp_server" value="{{ settings.smtp_server }}" required>
+            </div>
+            <div class="mb-3">
+            <label for="smtp_port" class="form-label">SMTP Port</label>
+            <input type="number" id="smtp_port" class="form-control" name="smtp_port" value="{{ settings.smtp_port }}" required>
+            </div>
+            <div class="mb-3">
+            <label for="smtp_username" class="form-label">SMTP Username</label>
+            <input type="text" id="smtp_username" class="form-control" name="smtp_username" value="{{ settings.smtp_username }}" required>
+            </div>           
+            <div class="mb-3">
+            <label for="smtp_password" class="form-label">SMTP Password</label>
+            <input type="password" id="smtp_password" class="form-control" name="smtp_password" value="{{ settings.smtp_password }}" required>
+            </div>            
+            <div class="mb-3">
+            <label for="default_sender" class="form-label">Default Email</label>
+            <input type="email" id="default_sender" class="form-control" name="default_sender" value="{{ settings.default_sender }}" required>
+            </div>           
+            <div class="mb-3">
+            <label for="smtp_use_tls" class="form-label">Use TLS</label>
+            <input type="checkbox" id="smtp_use_tls" class="form-control" name="smtp_use_tls" {% if settings.smtp_use_tls %}checked{% endif %}>
+            </div>            
+            <div class="mb-3">
+            <label for="smtp_use_ssl" class="form-label">Use SSL</label>
+            <input type="checkbox" id="smtp_use_ssl" class="form-control" name="smtp_use_ssl" {% if settings.smtp_use_ssl %}checked{% endif %}>
+            </div>            
+            <button type="submit" class="btn btn-success w-100">Save Settings</button>
         </form>
         
-        <a href="{{ url_for('admin_dashboard') }}" class="back-link">Back to Dashboard</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary w-100 mt-3">Back to Dashboard</a>
     </div>
 
-</body>
-</html>
+</div>
+{% endblock %}

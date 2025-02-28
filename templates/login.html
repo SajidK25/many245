@@ -70,41 +70,42 @@
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h1>Login</h1>
-        <div class="flash-messages">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        {% if category == 'error' %}
-                            {% set category = 'danger' %}
-                        {% elif category == 'message' %}
-                            {% set category = 'info' %}
-                        {% endif %}
-                        <div class="alert alert-{{ category }}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-        </div>
-        <form action="{{ url_for('login') }}" method="post">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" placeholder="Enter your username" required>
+    <div class="container mt-4 d-flex justify-content-center align-items-center" style="height: 100vh;">
+        <div class="card shadow p-4 " style="width: 400px;">
+            <h3 class="text-center mb-4">Login</h3>
+            <div class="flash-messages">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            {% if category == 'error' %}
+                                {% set category = 'danger' %}
+                            {% elif category == 'message' %}
+                                {% set category = 'info' %}
+                            {% endif %}
+                            <div class="alert alert-{{ category }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
             </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            <form action="{{ url_for('login') }}" method="post">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" id="username" class="form-control" name="username" placeholder="Enter your username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" class="form-control" name="password" placeholder="Enter your password" required>
+                </div>
+                <div class="mb-3">
+                    <button type="submit" class="btn btn-success w-100">Login</button>
+                </div>
+            </form>
+            <div class="links">
+                <a href="{{ url_for('register') }}">Register</a>
+                <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
             </div>
-            <div class="form-group">
-                <button type="submit">Login</button>
-            </div>
-        </form>
-        <div class="links">
-            <a href="{{ url_for('register') }}">Register</a>
-            <a href="{{ url_for('forgot_password') }}">Forgot Password?</a>
-        </div>
     </div>
 </body>
 </html>

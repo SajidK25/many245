@@ -1,94 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <title>User Dashboard</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f4f4f9;
-        }
-        .dashboard-container {
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 600px;
-        }
-        .dashboard-container h1 {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .user-info {
-            margin-bottom: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        .form-group button {
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        .form-group button:hover {
-            background-color: #45a049;
-        }
-        .logout-link {
-            display: block;
-            text-align: center;
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        .logout-link:hover {
-            background-color: #45a049;
-        }
-        .form-purchase{
-            display: inline-block;
+{% extends 'base.html' %}
 
-        }
-        .form-purchase button{
-            background-color:rgb(78, 76, 175);
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 16px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <div class="dashboard-container">
-        <h1>Welcome, {{ current_user.username }}</h1>
+{% block title %}User Dashboard{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h1 class="text-center">User Dashboard</h1>
         <div class="flash-messages">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -105,39 +21,32 @@
                 {% endif %}
             {% endwith %}
         </div>
-        <div class="user-info">
+        <div class="container mt-4">
+        <div class="card p-4">
+            <h2 class="mb-3">User Information</h2>
             <p><strong>Role:</strong> {{ current_user.role }}</p>
-            <p><strong>Email:</strong> {{ current_user.email }} 
-            <button id="verify-email-btn" onclick="sendVerificationEmail()"
-                {% if current_user.email_verified %} disabled style="background-color: green; color: white;" {% endif %}>
-                {% if current_user.email_verified %}
-                    ✅ Email Verified
-                {% else %}
-                    Verify Email
-                {% endif %}
-            </button></p>
-
-            <p id="verification-message" class="text-warning bg-dark"></p>
+            <p><strong>Email:</strong> {{ current_user.email }}
+                <button id="verify-email-btn" class="btn btn-sm {% if current_user.email_verified %}btn-success" disabled>{% else %}btn-warning" onclick="sendVerificationEmail()">{% endif %}
+                    {% if current_user.email_verified %}✅ Email Verified{% else %}Verify Email{% endif %}
+                </button>
+            </p>
+            <p id="verification-message" class="text-warning"></p>
 
             <p><strong>Phone Number:</strong> {{ current_user.phone_number }}
-            <button id="verify-phone-btn" onclick="sendVerificationOTP()"
-                {% if current_user.phone_verified %} disabled style="background-color: green; color: white;" {% endif %}>
-                {% if current_user.phone_verified %}
-                    ✅ Number Verified
-                {% else %}
-                    Verify Number
-                {% endif %}
-            </button></p>
+                <button id="verify-phone-btn" class="btn btn-sm {% if current_user.phone_verified %}btn-success" disabled>{% else %}btn-warning" onclick="sendVerificationOTP()">{% endif %}
+                    {% if current_user.phone_verified %}✅ Number Verified{% else %}Verify Number{% endif %}
+                </button>
+            </p>
+            <p id="verification-otp" class="text-warning"></p>
 
-           <p id="verification-otp" class="text-warning bg-dark"></p>
-           <!-- OTP Verification Form -->
             {% if not current_user.phone_verified %}
-            <div class="form-group">
-                <label for="otp">Enter OTP:</label>
+            <div class="mb-3">
+                <label for="otp" class="form-label">Enter OTP:</label>
                 <input type="text" id="otp" name="otp" class="form-control" placeholder="Enter OTP" required>
-                <button onclick="verifyOTP()">Verify OTP</button>
+                <button class="btn btn-primary mt-2" onclick="verifyOTP()">Verify OTP</button>
             </div>
             {% endif %}
+            
             <p><strong>Notifications:</strong> {% if current_user.notifications %}Enabled{% else %}Disabled{% endif %}</p>
             <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
             {% if current_user.payment_due_date %}
@@ -147,54 +56,57 @@
                 <p><strong>Max Allowed Logins:</strong> {{ current_user.max_logins }}</p>
             {% endif %}
         </div>
-        <form action="{{ url_for('update_amazon_relay') }}" method="post">
-            <div class="form-group">
-                <label for="amazon_relay_email">Amazon Relay Email</label>
-                <input type="email" id="amazon_relay_email" name="amazon_relay_email" value="{{ current_user.amazon_relay_email }}" placeholder="Enter your Amazon Relay email" required>
-            </div>
-            <div class="form-group">
-                <label for="amazon_relay_password">Amazon Relay Password</label>
-                <input type="password" id="amazon_relay_password" name="amazon_relay_password" placeholder="Enter your Amazon Relay password" required>
-            </div>
-            <div class="form-group">
-                <button type="submit">Save Amazon Relay Credentials</button>
-            </div>                          
-        </form>
-        {% if current_user.stripe_enabled %}
-            <div class="card">
-                <div class="card-header text-white bg-primary mb-3"><strong>Purchase Plans</strong></div>
-                <div class="card-body">
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item">
-                        <form class="form-purchase" action="{{ url_for('pay_subscription', user_id=current_user.id) }}" method="post">
-                            <button type="submit">Buy A Plan (${{ "%.2f"|format(monthly_fee) }})</button>
-                        </form>
-                    </li>
-                    <li class="list-group-item">
-                        <form class="form-purchase" action="{{ url_for('pay_sms_notification',user_id=current_user.id) }}" method="post">
-                            <button type="submit">Buy SMS Notification (${{ "%.2f"|format(sms_fee) }})</button>
-                        </form>
-                    </li>
-                    <li class="list-group-item">
-                    <form class="form-purchase" action="{{ url_for('pay_extra_login',user_id=current_user.id) }}" method="post">
-                        <button type="submit">Buy Extra Login (${{ "%.2f"|format(extra_login_price) }})</button>
-                    </form>
-                    </li>
-                </ul>
-                </div>
-            </div>
-  
-            {% else %}
-            <div class="card">
-                <div class="card-header text-dark bg-warning mb-3"><strong>Purchase Plans</strong></div>
-                <div class="card-body">
-                    <p class="card-text"><strong> Purchase Plans are not enabled for this account. Please contact Admin.</strong></p>
-                </div>
-            </div>
-            {% endif %}</p>
 
-        <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+        <div class="card p-4 mt-4">
+            <h2 class="mb-3">Amazon Relay Configuration</h2>
+            <form action="{{ url_for('update_amazon_relay') }}" method="post">
+                <div class="mb-3">
+                    <label for="amazon_relay_email" class="form-label">Amazon Relay Email</label>
+                    <input type="email" id="amazon_relay_email" name="amazon_relay_email" class="form-control" value="{{ current_user.amazon_relay_email }}" placeholder="Enter your Amazon Relay email" required>
+                </div>
+                <div class="mb-3">
+                    <label for="amazon_relay_password" class="form-label">Amazon Relay Password</label>
+                    <input type="password" id="amazon_relay_password" name="amazon_relay_password" class="form-control" placeholder="Enter your Amazon Relay password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Amazon Relay Credentials</button>
+            </form>
+        </div>
+
+        {% if current_user.stripe_enabled %}
+            <div class="card mt-4">
+                <div class="card-header text-white bg-primary"><strong>Purchase Plans</strong></div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <form action="{{ url_for('pay_subscription', user_id=current_user.id) }}" method="post">
+                                <button type="submit" class="btn btn-success w-100">Buy A Plan (${{ "%.2f"|format(monthly_fee) }})</button>
+                            </form>
+                        </li>
+                        <li class="list-group-item">
+                            <form action="{{ url_for('pay_sms_notification', user_id=current_user.id) }}" method="post">
+                                <button type="submit" class="btn btn-info w-100">Buy SMS Notification (${{ "%.2f"|format(sms_fee) }})</button>
+                            </form>
+                        </li>
+                        <li class="list-group-item">
+                            <form action="{{ url_for('pay_extra_login', user_id=current_user.id) }}" method="post">
+                                <button type="submit" class="btn btn-warning w-100">Buy Extra Login (${{ "%.2f"|format(extra_login_price) }})</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        {% else %}
+            <div class="card mt-4">
+                <div class="card-header text-dark bg-warning"><strong>Purchase Plans</strong></div>
+                <div class="card-body">
+                    <p class="card-text text-danger">Purchase Plans are not enabled for this account. Please contact Admin.</p>
+                </div>
+            </div>
+        {% endif %}
+
+        <a href="{{ url_for('logout') }}" class="btn btn-danger mt-4">Logout</a>
     </div>
+
     <script>
         function sendVerificationEmail() {
             fetch("{{ url_for('send_verification_email') }}", {
@@ -237,5 +149,4 @@
             });
         }
     </script>
-</body>
-</html>
+{% endblock %}
