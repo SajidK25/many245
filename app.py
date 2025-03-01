@@ -73,7 +73,7 @@ def set_extra_login_price(price):
     set_config_value("EXTRA_LOGIN_PRICE", str(price))
 
 def get_sms_price():
-    return float(get_config_value("SMS_PRICE") or 10.00)  # Default to $10
+    return round(float(get_config_value("SMS_PRICE") or 10.00),2)  # Default to $10
 
 def set_sms_price(price):
     set_config_value("SMS_PRICE", str(price))
@@ -610,6 +610,13 @@ def reset_user_sessions(user_id):
     flash("All sessions for the user have been reset.", "success")
     return redirect(url_for("admin_dashboard"))
 
+@app.route('/admin/history_logs', methods=['POST'])
+@login_required
+def history_logs():
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+5
 @app.route('/logout')
 @login_required
 def logout():
