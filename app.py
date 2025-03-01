@@ -7,7 +7,7 @@ from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired, BadTimeSignature,BadSignature
 from flask_mail import Mail, Message
-from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config
+from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config,HistoryLog
 from api import api_bp
 from utils import log_action
 import os
@@ -610,13 +610,27 @@ def reset_user_sessions(user_id):
     flash("All sessions for the user have been reset.", "success")
     return redirect(url_for("admin_dashboard"))
 
-@app.route('/admin/history_logs', methods=['POST'])
+@app.route('/admin/history_logs', methods=['GET'])
 @login_required
 def history_logs():
     if current_user.role != "admin":
         flash("Unauthorized access!", "error")
-        return redirect(url_for("admin_dashboard"))
-5
+        return redirect(url_for('login'))
+    logs = HistoryLog.query.order_by(HistoryLog.timestamp.desc()).all()
+    log_list = [
+            {
+                "id": log.id,
+                "user": log.user.username,
+                "role": log.user.role,
+                "action": log.action,
+                "timestamp": log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                "ip_address": log.ip_address,
+                "user_agent": log.user_agent,
+            }
+            for log in logs
+        ]
+    return render_template('admin_logs_history.html',logs=log_list)
+
 @app.route('/logout')
 @login_required
 def logout():

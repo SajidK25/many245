@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}History Logs{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h3 class="text-center">History Logs</h3>
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        {% if category == 'error' %}
+                            {% set category = 'danger' %}
+                        {% elif category == 'message' %}
+                            {% set category = 'info' %}
+                        {% endif %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between mb-3">
+                <input type="text" id="searchInput" class="form-control w-25" placeholder="Search by username, role, payment status">
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped" id="userTable">
+                    <thead>
+                        <tr>
+                            <th>Log ID</th>
+                            <th>User Name</th>
+                            <th>Role</th>
+                            <th>Date/Time</th>
+                            <th>Action</th>
+                            <th>IP</th>
+                            <th>User Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.id }}</td>
+                            <td>{{ log.user }}</td>
+                            <td>{{ log.role }}</td>
+                            <td>{{ log.timestamp }}</td>
+                            <td>{{ log.action }}</td>
+                            <td>{{ log.ip_address }}</td>
+                            <td>{{ log.user_agent }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <nav>
+                <ul class="pagination justify-content-center">
+                    <li class="page-item"><a class="page-link" href="#" id="prevPage">Previous</a></li>
+                    <li class="page-item"><a class="page-link" href="#" id="nextPage">Next</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+    <script>
+    document.getElementById("searchInput").addEventListener("keyup", function() {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll("#userTable tbody tr");
+        rows.forEach(row => {
+            let username = row.cells[0].textContent.toLowerCase();
+            let role = row.cells[1].textContent.toLowerCase();
+            let status = row.cells[2].textContent.toLowerCase();
+            row.style.display = (username.includes(filter) || role.includes(filter) || status.includes(filter)) ? "" : "none";
+        });
+    });
+
+    let currentPage = 1;
+    const rowsPerPage = 30;
+    function paginateTable() {
+        let rows = document.querySelectorAll("#userTable tbody tr");
+        let totalPages = Math.ceil(rows.length / rowsPerPage);
+        rows.forEach((row, index) => {
+            row.style.display = (index >= (currentPage - 1) * rowsPerPage && index < currentPage * rowsPerPage) ? "" : "none";
+        });
+        document.getElementById("prevPage").parentElement.classList.toggle("disabled", currentPage === 1);
+        document.getElementById("nextPage").parentElement.classList.toggle("disabled", currentPage === totalPages);
+    }
+    document.getElementById("prevPage").addEventListener("click", function(event) {
+        event.preventDefault();
+        if (currentPage > 1) {
+            currentPage--;
+            paginateTable();
+        }
+    });
+    document.getElementById("nextPage").addEventListener("click", function(event) {
+        event.preventDefault();
+        let rows = document.querySelectorAll("#userTable tbody tr");
+        if (currentPage < Math.ceil(rows.length / rowsPerPage)) {
+            currentPage++;
+            paginateTable();
+        }
+    });
+    paginateTable();
+</script>
+{% endblock %}
