@@ -645,8 +645,6 @@ def logout():
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
 
-
-
 @app.route('/admin_dashboard')
 @login_required
 def admin_dashboard():
@@ -656,6 +654,14 @@ def admin_dashboard():
     users = User.query.all()
     now = datetime.utcnow().date()
     return render_template('admin_dashboard.html', users=users,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
+
+@app.route('/admin_settings', methods=['GET'])
+@login_required
+def admin_settings():
+    if current_user.role != 'admin':
+        flash('Unauthorized access!', 'error')
+        return redirect(url_for('login'))
+    return render_template('admin_settings.html',monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
 
 @app.route('/user_dashboard')
 @login_required
