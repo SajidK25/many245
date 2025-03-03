@@ -180,9 +180,9 @@ def send_sms(destination, message):
 
 def notify_user(user, message):
     if user.notifications:
-        if user.phone_number:
+        if user.phone_number and user.sms_opt_in and user.phone_verified:
             send_sms(user.phone_number, message)
-        if user.email:
+        if user.email and user.email_enabled and user.email_verified:
             msg = Message('Notification', recipients=[user.email], body=message)
             mail.send(msg)
 
@@ -1175,6 +1175,34 @@ def toggle_stripe(user_id):
     db.session.commit()
 
     flash(f"Stripe payments {'enabled' if user.stripe_enabled else 'disabled'} for {user.username}.", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/toggle_email/<int:user_id>", methods=["POST"])
+@login_required
+def toggle_email(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    user = User.query.get_or_404(user_id)
+    user.email_enabled = not user.email_enabled
+    db.session.commit()
+
+    flash(f"Email notification {'enabled' if user.email_enabled else 'disabled'} for {user.username}.", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/toggle_push/<int:user_id>", methods=["POST"])
+@login_required
+def toggle_push(user_id):
+    if current_user.role != "admin":
+        flash("Unauthorized access!", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    user = User.query.get_or_404(user_id)
+    user.push_enabled = not user.push_enabled
+    db.session.commit()
+
+    flash(f"Push notification {'enabled' if user.push_enabled else 'disabled'} for {user.username}.", "success")
     return redirect(url_for("admin_dashboard"))
 
 @app.route("/admin/toggle_sms_opt_in/<int:user_id>", methods=["POST"])

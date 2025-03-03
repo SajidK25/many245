@@ -28,6 +28,8 @@ class User(db.Model, UserMixin):
     payment_status = db.Column(db.String(20), default="Unpaid")
     payment_due_date = db.Column(db.Date, nullable=True)
     stripe_enabled = db.Column(db.Boolean, default=False)
+    email_enabled = db.Column(db.Boolean, default=False)
+    push_enabled = db.Column(db.Boolean, default=False)
     email_verified = db.Column(db.Boolean, default=False)
     verification_token = db.Column(db.String(100), nullable=True)
     phone_verified = db.Column(db.Boolean, default=False)
