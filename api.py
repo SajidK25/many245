@@ -9,6 +9,15 @@ from flask_restful import Api
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 api = Api(api_bp)
 
+
+def require_api_key(func):
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get("Authorization")
+        if not api_key or not APIKey.query.filter_by(key=api_key).first():
+            return {"message": "Invalid API Key"}, 403
+        return func(*args, **kwargs)
+    return decorated_function
+
 class LoginAPI(Resource):
     def post(self):
         data = request.json
@@ -196,7 +205,13 @@ class GenerateAPIKeyAPI(Resource):
         log_action(current_user.id, f"Generated API Key for {user.username}")
         return {"message": "API Key generated", "api_key": new_key.key}, 200
 
+class SecureAdminAPI(Resource):
+    @require_api_key
+    def get(self):
+        return {"message": "Secure API response"}, 200
+
 # Register API Endpoints
+api.add_resource(SecureAdminAPI, "/secure/admin")
 api.add_resource(LoginAPI, "/login")
 api.add_resource(LogoutAPI, "/logout")
 api.add_resource(UserDashboardAPI, "/user/dashboard")

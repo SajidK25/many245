@@ -7,7 +7,7 @@ from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired, BadTimeSignature,BadSignature
 from flask_mail import Mail, Message
-from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config,HistoryLog
+from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config,HistoryLog,APIKey
 from api import api_bp
 from utils import log_action
 import os
@@ -795,7 +795,7 @@ def process_payment(user_id):
     return redirect(url_for('admin_dashboard'))
 
 # API Keys
-@app.route('/admin/generate_api_key/<int:user_id>', methods=['POST'])
+@app.route('/admin/generate_api_key/<int:user_id>', methods=['GET','POST'])
 @login_required
 def generate_api_key(user_id):
     if current_user.role != "admin":

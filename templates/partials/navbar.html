@@ -12,6 +12,9 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark fw-bold link-secondary {% if request.path == url_for('admin_settings') %}active{% endif %}" href="{{ url_for('admin_settings') }}">Settings</a>
                         </li>
+                         <li class="nav-item">
+                            <a class="nav-link text-dark fw-bold link-secondary {% if request.path == url_for('list_api_keys') %}active{% endif %}" href="{{ url_for('list_api_keys') }}">API</a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark fw-bold link-secondary {% if request.path == url_for('history_logs') %}active{% endif %}" href="{{ url_for('history_logs') }}">History Logs</a>
                         </li>
