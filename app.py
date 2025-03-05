@@ -663,6 +663,15 @@ def admin_settings():
         return redirect(url_for('login'))
     return render_template('admin_settings.html',monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
 
+@app.route('/user_settings', methods=['GET'])
+@login_required
+def user_settings():
+    # if current_user.role == 'user':
+    #     flash('Unauthorized access!', 'error')
+    #     return redirect(url_for('login'))
+    return render_template('admin_settings.html',monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
+
+
 @app.route('/user_dashboard')
 @login_required
 def user_dashboard():
