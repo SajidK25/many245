@@ -38,6 +38,7 @@ class User(db.Model, UserMixin):
     amazon_relay_password = db.Column(db.String(60), nullable=True)
     sms_opt_in = db.Column(db.Boolean, default=False)  # Track if SMS alerts are enabled
     sms_fee_due = db.Column(db.Float, default=0.0)  # Track the prorated amount
+    timezone = db.Column(db.String(50), default="UTC")  # Track the user's timezone
     def set_password(self, password):
         self.password = bcrypt.generate_password_hash(password).decode('utf-8')
 

@@ -20,6 +20,9 @@
                         </li>
                     {% endif %}
                     <li class="nav-item">
+                        <a class="nav-link text-dark fw-bold link-secondary {% if request.path == url_for('user_dashboard') %}active{% endif %}" href="{{ url_for('user_dashboard') }}">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link text-dark fw-bold link-secondary {% if request.path == url_for('relay_data') %}active{% endif %}" href="{{ url_for('relay_data') }}">Relay Data</a>
                     </li>
                     <li class="nav-item">

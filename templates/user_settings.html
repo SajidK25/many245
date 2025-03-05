@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}User Settings{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h3 class="text-center">User Settings</h3>
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        {% if category == 'error' %}
+                            {% set category = 'danger' %}
+                        {% elif category == 'message' %}
+                            {% set category = 'info' %}
+                        {% endif %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        <div class="container mt-4">
+            <div class="card p-4 mt-4">
+                <h2 class="mb-3">Timezone Settings</h2>
+                <form action="{{ url_for('update_timezone') }}" method="post">
+                    <div class="mb-3">
+                        <label for="timezone" class="form-label">Select Your Timezone</label>
+                        <select class="form-select" id="timezone" name="timezone" required>
+                            <option value="" disabled selected>Choose a timezone</option>
+                            {% for tz in timezones %}
+                                <option value="{{ tz }}" {% if tz == current_user.timezone %}selected{% endif %}>{{ tz }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Timezone</button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+{% endblock %}

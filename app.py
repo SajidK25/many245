@@ -7,7 +7,7 @@ from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired, BadTimeSignature,BadSignature
 from flask_mail import Mail, Message
-from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config,HistoryLog,APIKey
+from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config,HistoryLog,APIKey,RelayData
 from api import api_bp
 from utils import log_action
 import os
@@ -15,6 +15,7 @@ import stripe
 import uuid
 import requests
 import random
+import pytz 
 # from werkzeug.security import generate_password_hash
 import smtplib
 
@@ -666,11 +667,16 @@ def admin_settings():
 @app.route('/user_settings', methods=['GET'])
 @login_required
 def user_settings():
-    # if current_user.role == 'user':
-    #     flash('Unauthorized access!', 'error')
-    #     return redirect(url_for('login'))
-    return render_template('admin_settings.html',monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
+    return render_template('user_settings.html',timezones=pytz.all_timezones,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
 
+@app.route('/update_timezone', methods=['POST'])
+@login_required
+def update_timezone():
+    timezone = request.form.get("timezone")
+    if timezone in pytz.all_timezones:
+        current_user.timezone = timezone
+        db.session.commit()
+    return redirect(url_for('user_settings'))
 
 @app.route('/user_dashboard')
 @login_required
@@ -682,7 +688,7 @@ def user_dashboard():
         flash('Access restricted. Please contact the admin to make a payment.', 'error')
         return redirect(url_for('login'))
     now = datetime.utcnow().date()
-    return render_template('user_dashboard.html',users=current_user,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
+    return render_template('user_dashboard.html',pytz=pytz,users=current_user,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -1303,6 +1309,55 @@ def update_amazon_relay():
         flash('Both fields are required.', 'error')
     
     return redirect(url_for('user_dashboard'))
+
+@app.route('/relay_data', methods=['GET', 'POST'])
+def relay_data():
+    search_filters = {
+        'contract_id': request.args.get('contract_id'),
+        'load_id': request.args.get('load_id'),
+        'driver_name': request.args.get('driver_name'),
+    }
+
+    query = RelayData.query
+
+    for field, value in search_filters.items():
+        if value:
+            query = query.filter(getattr(RelayData, field).ilike(f"%{value}%"))
+
+    filtered_data = query.all()
+
+    return render_template("relay_data.html", relay_data=filtered_data)
+
+@app.route('/send_alert', methods=['POST'])
+def send_alert():
+    load_id = request.form.get('load_id')
+    alert_type = request.form.get('alert_type')
+
+    # Fetch load data
+    load_data = RelayData.query.filter_by(load_id=load_id).first()
+
+    # Handle Alerts
+    if alert_type == 'sms':
+        send_sms(f"ALERT: Issue with Load {load_id} - {load_data.status}")
+    elif alert_type == 'email':
+        send_email("Load Alert", f"ALERT: Issue with Load {load_id} - {load_data.status}")
+    elif alert_type == 'push':
+        send_push_notification(f"ALERT: Issue with Load {load_id} - {load_data.status}")
+
+    flash(f"{alert_type.upper()} Alert Sent for Load {load_id}", "success")
+    return redirect(url_for('relay_data'))
+
+def send_sms(message):
+    # Example: Integrate with Twilio or VoIP.ms
+    print("Sending SMS:", message)
+
+def send_email(subject, body):
+    # Example: Use Flask-Mail or SMTP here
+    print("Sending Email:", subject, body)
+
+def send_push_notification(message):
+    # Example: Push notification logic here
+    print("Sending Push Notification:", message)
 
 
 @app.cli.command('initdb')
