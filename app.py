@@ -224,6 +224,7 @@ def update_smtp_settings():
 
         db.session.add(settings)
         db.session.commit()
+        log_action(current_user.id, f"Updated SMTP settings")
         flash("SMTP settings updated successfully!", "success")
         return redirect(url_for('admin_dashboard'))  # Redirect admin to dashboard
 
@@ -256,6 +257,7 @@ def test_smtp():
             msg = Message("Test Email", sender=smtp_settings["MAIL_USERNAME"], recipients=[test_email])
             msg.body = "This is a test email to verify SMTP settings."
             mail.send(msg)
+            log_action(current_user.id, f"Sent test email to {test_email}")
             flash(f"✅ Test email sent to {test_email} successfully!", "success")
         except smtplib.SMTPException as e:
             flash(f"❌ Failed to send test email: {str(e)}", "error")
@@ -273,6 +275,7 @@ def test_sms():
 
         try:
             send_sms(dest_no, test_sms)
+            log_action(current_user.id, f"Sent test sms to {dest_no}")
             flash(f"✅ Test sms sent to {dest_no} successfully!", "success")
         except Exception as e:
             flash(f"❌ Failed to send test sms: {str(e)}", "error")
@@ -312,6 +315,7 @@ def update_voipms_settings():
             voip_settings.sms_fee = sms_fee
 
         db.session.commit()
+        log_action(current_user.id, f"Updated VoIP.ms settings")
         flash("VoIP.ms settings updated successfully!", "success")
         return redirect(url_for('admin_dashboard'))
 
@@ -338,6 +342,7 @@ def register():
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
+            log_action(user.id, "User registered")
             flash('Registration successful. Please log in.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
@@ -379,6 +384,7 @@ def send_verification_email():
 
     # flash('Verification email sent. Please check your inbox.', 'success')
     # return redirect(url_for('user_dashboard'))
+    log_action(current_user.id, f"Sent verification email to {current_user.email}")
     return jsonify({"message": "Verification email sent! Check your inbox."})
 
 @app.route('/verify_email/<token>')
@@ -388,6 +394,7 @@ def verify_email(token):
         user.email_verified = True
         user.verification_token = None
         db.session.commit()
+        log_action(user.id, "Email verified")
         flash('Email successfully verified!', 'success')
     else:
         flash('Invalid or expired token.', 'error')
@@ -408,6 +415,7 @@ def forgot_password():
             email_body = f"Click the link below to reset your password:\n{reset_url}"
 
             if send_email(user.email, email_subject, email_body):
+                log_action(user.id, "Password reset email sent")
                 flash("Check your email for password reset instructions.", "success")
             else:
                 flash("Failed to send email. Contact support.", "error")
@@ -433,7 +441,7 @@ def reset_password(token):
         new_password = request.form.get('password')
         user.set_password(new_password)
         db.session.commit()
-
+        log_action(user.id, "Password reset")
         flash("Your password has been reset. Please log in.", "success")
         return redirect(url_for("login"))
 
@@ -451,6 +459,7 @@ def send_otp():
 
     try:
         send_sms(dest_no, test_sms)
+        log_action(current_user.id, f"Sent test sms to {dest_no}")
         flash(f"✅ Test sms sent to {dest_no} successfully!", "success")
     except Exception as e:
             flash(f"❌ Failed to send test sms: {str(e)}", "error")
@@ -465,6 +474,7 @@ def verify_otp():
         current_user.phone_verification_token = None
         current_user.phone_verified = True
         db.session.commit()
+        log_action(current_user.id, "Phone number verified")
         flash('Phone number successfully verified!', 'success')
     else:
         flash('Invalid OTP.', 'error')
@@ -504,6 +514,7 @@ def login():
         # Admins have unlimited logins
         if user.role == "admin":
             login_user(user)
+            log_action(user.id, "Admin logged in")
             flash("Admin login successful!", "success")
             return redirect(url_for('admin_dashboard'))
 
@@ -534,6 +545,7 @@ def update_login_price():
     new_price = request.form["extra_login_price"]
     try:
         set_extra_login_price(round(float(new_price),2))
+        log_action(current_user.id, f"Updated extra login price to ${new_price}")
         flash("Extra login price updated successfully!", "success")
     except ValueError:
         flash("Invalid price entered.", "error")
@@ -550,6 +562,7 @@ def update_sms_price():
     new_price = request.form["sms_price"]
     try:
         set_sms_price(round(float(new_price),2))
+        log_action(current_user.id, f"Updated sms price to ${new_price}")
         flash("Extra login price updated successfully!", "success")
     except ValueError:
         flash("Invalid price entered.", "error")
@@ -678,6 +691,7 @@ def update_timezone():
     if timezone in pytz.all_timezones:
         current_user.timezone = timezone
         db.session.commit()
+        log_action(current_user.id, f"Updated timezone to {timezone}")
         flash("Timezone updated successfully!", "success")
     return redirect(url_for('user_settings'))
 
@@ -722,6 +736,7 @@ def edit_user(user_id):
             user.set_amazon_relay_password(amazon_relay_password)
         
         db.session.commit()
+        log_action(current_user.id, f"Updated user {user.username}")
         flash(f"User {user.username}'s details have been updated.", 'success')
         return redirect(url_for('admin_dashboard'))
 
@@ -744,7 +759,7 @@ def mark_paid(user_id):
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method)
         db.session.add(payment)
         db.session.commit()
-
+        log_action(current_user.id, f"Marked {user.username} as paid")
         flash(f"Payment of ${amount} recorded for {user.username}. Next payment due on {user.payment_due_date.strftime('%Y-%m-%d')}.", 'success')
         return redirect(url_for('admin_dashboard'))
 
@@ -766,7 +781,7 @@ def add_payment(user_id):
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method)
         db.session.add(payment)
         db.session.commit()
-
+        log_action(current_user.id, f"Added payment for {user.username}")
         flash(f"Payment of ${amount} added for {user.username} using {payment_method}.", 'success')
         return redirect(url_for('admin_dashboard'))
 
@@ -799,6 +814,7 @@ def process_payment(user_id):
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
         db.session.add(payment)
         db.session.commit()
+        log_action(current_user.id, f"Processed payment for {user.username}")
         flash("Payment recorded successfully!", "success")
         return redirect(url_for('admin_dashboard'))
 
@@ -823,7 +839,7 @@ def generate_api_key(user_id):
     new_key = APIKey(user_id=user_id)
     db.session.add(new_key)
     db.session.commit()
-
+    log_action(current_user.id, f"Generated API key for user ID {user_id}")
     flash("New API key generated.", "success")
     return redirect(url_for("admin_dashboard"))
 
@@ -861,6 +877,7 @@ def process_subscription_payment(user_id):
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
         db.session.add(payment)
         db.session.commit()
+        log_action(current_user.id, f"Processed subscription payment for {user.username}")
         flash("Payment recorded successfully!", "success")
         return redirect(url_for('user_settings'))
 
@@ -944,6 +961,7 @@ def process_sms_payment(user_id):
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
         db.session.add(payment)
         db.session.commit()
+        log_action(current_user.id, f"Processed SMS payment for {user.username}")
         flash("Payment recorded successfully!", "success")
         return redirect(url_for('user_settings'))
 
@@ -1026,6 +1044,7 @@ def process_extra_login_payment(user_id):
         payment = Payment(user_id=user.id, amount=amount, payment_method=payment_method, status='success')
         db.session.add(payment)
         db.session.commit()
+        log_action(current_user.id, f"Processed extra login payment for {user.username}")
         flash("Payment recorded successfully!", "success")
         return redirect(url_for('user_settings'))
 
@@ -1145,7 +1164,7 @@ def update_stripe_keys():
 
         set_config_value("STRIPE_PUBLIC_KEY", stripe_public_key)
         set_config_value("STRIPE_SECRET_KEY", stripe_secret_key)
-
+        log_action(current_user.id, "Updated Stripe API keys")
         flash("Stripe API keys updated successfully!", "success")
         return redirect(url_for("admin_dashboard"))
 
@@ -1174,6 +1193,7 @@ def user_payment():
             current_user.is_paid = True
             current_user.payment_due_date = datetime.utcnow().date() + timedelta(days=30)
             db.session.commit()
+            log_action(current_user.id, "Payment processed")
             flash("Payment successful!", "success")
             return redirect(url_for("user_dashboard"))
         except stripe.error.StripeError as e:
@@ -1191,7 +1211,7 @@ def toggle_stripe(user_id):
     user = User.query.get_or_404(user_id)
     user.stripe_enabled = not user.stripe_enabled
     db.session.commit()
-
+    log_action(current_user.id, f"{'Enabled' if user.stripe_enabled else 'Disabled'} Stripe payments for {user.username}")
     flash(f"Stripe payments {'enabled' if user.stripe_enabled else 'disabled'} for {user.username}.", "success")
     return redirect(url_for("admin_dashboard"))
 
@@ -1205,7 +1225,7 @@ def toggle_email(user_id):
     user = User.query.get_or_404(user_id)
     user.email_enabled = not user.email_enabled
     db.session.commit()
-
+    log_action(current_user.id, f"{'Enabled' if user.email_enabled else 'Disabled'} email notifications for {user.username}")
     flash(f"Email notification {'enabled' if user.email_enabled else 'disabled'} for {user.username}.", "success")
     return redirect(url_for("admin_dashboard"))
 
@@ -1219,7 +1239,7 @@ def toggle_push(user_id):
     user = User.query.get_or_404(user_id)
     user.push_enabled = not user.push_enabled
     db.session.commit()
-
+    log_action(current_user.id, f"{'Enabled' if user.push_enabled else 'Disabled'} push notifications for {user.username}")
     flash(f"Push notification {'enabled' if user.push_enabled else 'disabled'} for {user.username}.", "success")
     return redirect(url_for("admin_dashboard"))
 
@@ -1242,10 +1262,12 @@ def toggle_sms_opt_in(user_id):
         user.sms_fee_due = prorated_fee
         user.sms_opt_in = True
         user.notifications= True
+        log_action(current_user.id, f"Enabled SMS alerts for {user.username}")
         flash(f"SMS alerts enabled. Prorated fee: ${prorated_fee}. Please proceed to payment.", "success")
     else:
         user.sms_opt_in = False
         user.notifications= False
+        log_action(current_user.id, f"Disabled SMS alerts for {user.username}")
         flash("SMS alerts disabled.", "success")
 
     db.session.commit()
@@ -1272,7 +1294,7 @@ def payment():
             current_user.payment_due_date = datetime.utcnow().date() + timedelta(days=30)
             current_user.sms_fee_due = 0.0
             db.session.commit()
-
+            log_action(current_user.id, "Payment processed")
             flash("Payment successful!", "success")
             return redirect(url_for("user_dashboard"))
         except stripe.error.StripeError as e:
@@ -1290,6 +1312,7 @@ def update_monthly_fee():
     new_fee = request.form["monthly_fee"]
     try:
         set_monthly_fee(round(float(new_fee),2))
+        log_action(current_user.id, f"Updated monthly fee to ${new_fee}")
         flash("Monthly fee updated successfully!", "success")
     except ValueError:
         flash("Invalid amount. Please enter a valid number.", "error")
@@ -1307,6 +1330,7 @@ def update_amazon_relay():
         current_user.amazon_relay_email = amazon_relay_email
         current_user.set_amazon_relay_password(amazon_relay_password)  # Encrypt password
         db.session.commit()
+        log_action(current_user.id, "Updated Amazon Relay credentials")
         flash('Amazon Relay credentials updated successfully.', 'success')
     else:
         flash('Both fields are required.', 'error')
