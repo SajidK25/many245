@@ -37,7 +37,130 @@
                     <button type="submit" class="btn btn-primary">Update Timezone</button>
                 </form>
             </div>
+            <div class="card p-4">
+                <h2 class="mb-3">User Information</h2>
+                <p><strong>Role:</strong> {{ current_user.role }}</p>
+                <p><strong>Email:</strong> {{ current_user.email }}
+                    <button id="verify-email-btn" class="btn btn-sm {% if current_user.email_verified %}btn-success" disabled>{% else %}btn-warning" onclick="sendVerificationEmail()">{% endif %}
+                        {% if current_user.email_verified %}✅ Email Verified{% else %}Verify Email{% endif %}
+                    </button>
+                </p>
+                <p id="verification-message" class="text-warning"></p>
+
+                <p><strong>Phone Number:</strong> {{ current_user.phone_number }}
+                    <button id="verify-phone-btn" class="btn btn-sm {% if current_user.phone_verified %}btn-success" disabled>{% else %}btn-warning" onclick="sendVerificationOTP()">{% endif %}
+                        {% if current_user.phone_verified %}✅ Number Verified{% else %}Verify Number{% endif %}
+                    </button>
+                </p>
+                <p id="verification-otp" class="text-warning"></p>
+
+                {% if not current_user.phone_verified %}
+                <div class="mb-3">
+                    <label for="otp" class="form-label">Enter OTP:</label>
+                    <input type="text" id="otp" name="otp" class="form-control" placeholder="Enter OTP" required>
+                    <button class="btn btn-primary mt-2" onclick="verifyOTP()">Verify OTP</button>
+                </div>
+                {% endif %}
+                
+                <p><strong>Notifications:</strong> {% if current_user.notifications %}Enabled{% else %}Disabled{% endif %}</p>
+                <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
+                {% if current_user.payment_due_date %}
+                    <p><strong>Next Payment Due:</strong> {{ current_user.payment_due_date.strftime('%Y-%m-%d') }}</p>
+                    {% set days_remaining = (current_user.payment_due_date - now).days %}
+                    <p><strong>Days Remaining:</strong> {% if days_remaining >= 0 %}{{ days_remaining }} days{% else %}Payment expired{% endif %}</p>
+                    <p><strong>Max Allowed Logins:</strong> {{ current_user.max_logins }}</p>
+                {% endif %}
+            </div>
+
+            <div class="card p-4 mt-4">
+                <h2 class="mb-3">Amazon Relay Configuration</h2>
+                <form action="{{ url_for('update_amazon_relay') }}" method="post">
+                    <div class="mb-3">
+                        <label for="amazon_relay_email" class="form-label">Amazon Relay Email</label>
+                        <input type="email" id="amazon_relay_email" name="amazon_relay_email" class="form-control" value="{{ current_user.amazon_relay_email }}" placeholder="Enter your Amazon Relay email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="amazon_relay_password" class="form-label">Amazon Relay Password</label>
+                        <input type="password" id="amazon_relay_password" name="amazon_relay_password" class="form-control" placeholder="Enter your Amazon Relay password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Amazon Relay Credentials</button>
+                </form>
+            </div>
+
+            {% if current_user.stripe_enabled %}
+                <div class="card mt-4">
+                    <div class="card-header text-white bg-primary"><strong>Purchase Plans</strong></div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <form action="{{ url_for('pay_subscription', user_id=current_user.id) }}" method="post">
+                                    <button type="submit" class="btn btn-success w-100">Buy A Plan (${{ "%.2f"|format(monthly_fee) }})</button>
+                                </form>
+                            </li>
+                            <li class="list-group-item">
+                                <form action="{{ url_for('pay_sms_notification', user_id=current_user.id) }}" method="post">
+                                    <button type="submit" class="btn btn-info w-100">Buy SMS Notification (${{ "%.2f"|format(sms_fee) }})</button>
+                                </form>
+                            </li>
+                            <li class="list-group-item">
+                                <form action="{{ url_for('pay_extra_login', user_id=current_user.id) }}" method="post">
+                                    <button type="submit" class="btn btn-warning w-100">Buy Extra Login (${{ "%.2f"|format(extra_login_price) }})</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            {% else %}
+                <div class="card mt-4">
+                    <div class="card-header text-dark bg-warning"><strong>Purchase Plans</strong></div>
+                    <div class="card-body">
+                        <p class="card-text text-danger">Purchase Plans are not enabled for this account. Please contact Admin.</p>
+                    </div>
+                </div>
+            {% endif %}
 
         </div>
     </div>
+    <script>
+        function sendVerificationEmail() {
+            fetch("{{ url_for('send_verification_email') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("verification-message").innerText = data.message;
+            });
+        }
+    </script>
+    <script>
+        function sendVerificationOTP() {
+            fetch("{{ url_for('send_otp') }}", {
+                method: "POST"
+            })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("verification-otp").innerText = "OTP sent successfully! Check your phone.";
+            })
+            .catch(error => {
+                document.getElementById("verification-otp").innerText = "Failed to send OTP.";
+            });
+        }
+
+        function verifyOTP() {
+            const otpValue = document.getElementById("otp").value;
+            fetch("{{ url_for('verify_otp') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: "otp=" + encodeURIComponent(otpValue)
+            })
+            .then(response => response.text())
+            .then(data => {
+                location.reload();
+            })
+            .catch(error => {
+                alert("OTP verification failed");
+            });
+        }
+    </script>
 {% endblock %}

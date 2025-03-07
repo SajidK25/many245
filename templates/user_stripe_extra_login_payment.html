@@ -74,7 +74,7 @@
         if (data.success) {
             resultDiv.style.color = "green";  // Show success message in green
             setTimeout(() => {
-                window.location.href = "{{ url_for('user_dashboard') }}";
+                window.location.href = "{{ url_for('user_settings') }}";
             }, 2000);
         } else {
             resultDiv.style.color = "red";  // Show error message in red

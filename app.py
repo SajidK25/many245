@@ -667,7 +667,9 @@ def admin_settings():
 @app.route('/user_settings', methods=['GET'])
 @login_required
 def user_settings():
-    return render_template('user_settings.html',timezones=pytz.all_timezones,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
+    now = datetime.utcnow().date()
+    gmt_zones = [tz for tz in pytz.all_timezones if 'GMT' in tz]
+    return render_template('user_settings.html',timezones=gmt_zones,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
 
 @app.route('/update_timezone', methods=['POST'])
 @login_required
@@ -676,6 +678,7 @@ def update_timezone():
     if timezone in pytz.all_timezones:
         current_user.timezone = timezone
         db.session.commit()
+        flash("Timezone updated successfully!", "success")
     return redirect(url_for('user_settings'))
 
 @app.route('/user_dashboard')
@@ -847,7 +850,7 @@ def process_subscription_payment(user_id):
     user = User.query.get(user_id)
     if not user:
         flash("User not found", "error")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     payment_method = request.form.get('payment_method')
     amount = round(float(request.form.get('amount', 0)))
@@ -859,17 +862,17 @@ def process_subscription_payment(user_id):
         db.session.add(payment)
         db.session.commit()
         flash("Payment recorded successfully!", "success")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     elif payment_method == 'card':
         if not user.stripe_enabled:
             flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
-            return redirect(url_for('user_dashboard'))
+            return redirect(url_for('user_settings'))
 
         return redirect(url_for('user_stripe_payment_subscription', user_id=user.id, amount=amount))
 
     flash("Invalid payment method selected", "error")
-    return redirect(url_for('user_dashboard'))
+    return redirect(url_for('user_settings'))
 
 @app.route('/user_stripe_payment_subscription/<int:user_id>/<float:amount>')
 def user_stripe_payment_subscription(user_id, amount):
@@ -877,7 +880,7 @@ def user_stripe_payment_subscription(user_id, amount):
     stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
     if not user or not user.stripe_enabled:
         flash("User not found or Stripe not enabled", "error")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     return render_template("user_stripe_payment_subscription.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
 
@@ -930,7 +933,7 @@ def process_sms_payment(user_id):
     user = User.query.get(user_id)
     if not user:
         flash("User not found", "error")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     payment_method = request.form.get('payment_method')
     amount = float(request.form.get('amount', 0))
@@ -942,17 +945,17 @@ def process_sms_payment(user_id):
         db.session.add(payment)
         db.session.commit()
         flash("Payment recorded successfully!", "success")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     elif payment_method == 'card':
         if not user.stripe_enabled:
             flash("Stripe payments are not enabled for this user.Please contact admin to enable Stripe.", "error")
-            return redirect(url_for('user_dashboard'))
+            return redirect(url_for('user_settings'))
 
         return redirect(url_for('user_stripe_sms_payment', user_id=user.id, amount=amount))
 
     flash("Invalid payment method selected", "error")
-    return redirect(url_for('user_dashboard'))
+    return redirect(url_for('user_settings'))
 
 @app.route('/user_stripe_sms_payment/<int:user_id>/<float:amount>')
 def user_stripe_sms_payment(user_id, amount):
@@ -960,7 +963,7 @@ def user_stripe_sms_payment(user_id, amount):
     stripe_public_key = get_config_value("STRIPE_PUBLIC_KEY")
     if not user or not user.stripe_enabled:
         flash("User not found or Stripe not enabled", "error")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     return render_template("user_stripe_sms_payment.html", user_id=user_id, amount=amount, stripe_public_key=stripe_public_key)
 
@@ -1013,7 +1016,7 @@ def process_extra_login_payment(user_id):
     user = User.query.get(user_id)
     if not user:
         flash("User not found", "error")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     payment_method = request.form.get('payment_method')
     amount = float(request.form.get('amount', 0))
@@ -1024,7 +1027,7 @@ def process_extra_login_payment(user_id):
         db.session.add(payment)
         db.session.commit()
         flash("Payment recorded successfully!", "success")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('user_settings'))
 
     elif payment_method == 'card':
         if not user.stripe_enabled:
@@ -1034,7 +1037,7 @@ def process_extra_login_payment(user_id):
         return redirect(url_for('user_stripe_extra_login_payment', user_id=user.id, amount=amount))
 
     flash("Invalid payment method selected", "error")
-    return redirect(url_for('user_dashboard'))
+    return redirect(url_for('user_settings'))
 
 @app.route('/user_stripe_extra_login_payment/<int:user_id>/<float:amount>')
 def user_stripe_extra_login_payment(user_id, amount):
@@ -1308,7 +1311,7 @@ def update_amazon_relay():
     else:
         flash('Both fields are required.', 'error')
     
-    return redirect(url_for('user_dashboard'))
+    return redirect(url_for('user_settings'))
 
 @app.route('/relay_data', methods=['GET', 'POST'])
 def relay_data():
