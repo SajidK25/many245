@@ -3,150 +3,171 @@
 {% block title %}User Dashboard{% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h3 class="text-center">User Dashboard</h3>
-        <div class="flash-messages">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        {% if category == 'error' %}
-                            {% set category = 'danger' %}
-                        {% elif category == 'message' %}
-                            {% set category = 'info' %}
-                        {% endif %}
-                        <div class="alert alert-{{ category }}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-        </div>
-        <div class="container mt-4">
-        <div class="card p-4">
-            <h2 class="mb-3">User Information</h2>
-            <p><strong>Role:</strong> {{ current_user.role }}</p>
-            <p><strong>Email:</strong> {{ current_user.email }}
-                <button id="verify-email-btn" class="btn btn-sm {% if current_user.email_verified %}btn-success" disabled>{% else %}btn-warning" onclick="sendVerificationEmail()">{% endif %}
-                    {% if current_user.email_verified %}✅ Email Verified{% else %}Verify Email{% endif %}
-                </button>
-            </p>
-            <p id="verification-message" class="text-warning"></p>
+<style>
+        body {
+            background-color: #1e1e1e;
+            color: black;
+            font-family: Arial, sans-serif;
+        }
+        h3 {
+            color: white;
+        }
+        .filter-container { margin-bottom: 20px; background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .filter-container input, .filter-container select { padding: 10px; margin: 5px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .search-btn { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .search-btn:hover { background-color: #45a049; }
 
-            <p><strong>Phone Number:</strong> {{ current_user.phone_number }}
-                <button id="verify-phone-btn" class="btn btn-sm {% if current_user.phone_verified %}btn-success" disabled>{% else %}btn-warning" onclick="sendVerificationOTP()">{% endif %}
-                    {% if current_user.phone_verified %}✅ Number Verified{% else %}Verify Number{% endif %}
-                </button>
-            </p>
-            <p id="verification-otp" class="text-warning"></p>
+        /* Color Alert Styles */
+        .late { background-color: #f8d7da; color: #721c24; } /* Red */
+        .on-time { background-color: #d4edda; color: #155724; } /* Green */
+        .bobtail { background-color: #fff3cd; color: #856404; } /* Orange */
+        .nav-tabs .nav-link {
+            color: #00aaff;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: transparent;
+            border-bottom: 2px solid #00aaff;
+            color: white;
+        }
+        .table {
+            color: white;
+        }
+</style>
+ <div class="container mt-4">
+    <h3>Amazon Relay Data Viewer</h3>
+    
+    <!-- Tabs -->
+    <ul class="nav nav-tabs" id="relayTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#inTransit">IN TRANSIT</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#upcoming">UPCOMING</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#history">HISTORY</a>
+        </li>
+    </ul>
 
-            {% if not current_user.phone_verified %}
-            <div class="mb-3">
-                <label for="otp" class="form-label">Enter OTP:</label>
-                <input type="text" id="otp" name="otp" class="form-control" placeholder="Enter OTP" required>
-                <button class="btn btn-primary mt-2" onclick="verifyOTP()">Verify OTP</button>
-            </div>
-            {% endif %}
-            
-            <p><strong>Notifications:</strong> {% if current_user.notifications %}Enabled{% else %}Disabled{% endif %}</p>
-            <p><strong>Payment Status:</strong> {% if current_user.is_paid %}Paid{% else %}Unpaid{% endif %}</p>
-            {% if current_user.payment_due_date %}
-                <p><strong>Next Payment Due:</strong> {{ current_user.payment_due_date.strftime('%Y-%m-%d') }}</p>
-                {% set days_remaining = (current_user.payment_due_date - now).days %}
-                <p><strong>Days Remaining:</strong> {% if days_remaining >= 0 %}{{ days_remaining }} days{% else %}Payment expired{% endif %}</p>
-                <p><strong>Max Allowed Logins:</strong> {{ current_user.max_logins }}</p>
-            {% endif %}
-        </div>
-
-        <div class="card p-4 mt-4">
-            <h2 class="mb-3">Amazon Relay Configuration</h2>
-            <form action="{{ url_for('update_amazon_relay') }}" method="post">
-                <div class="mb-3">
-                    <label for="amazon_relay_email" class="form-label">Amazon Relay Email</label>
-                    <input type="email" id="amazon_relay_email" name="amazon_relay_email" class="form-control" value="{{ current_user.amazon_relay_email }}" placeholder="Enter your Amazon Relay email" required>
-                </div>
-                <div class="mb-3">
-                    <label for="amazon_relay_password" class="form-label">Amazon Relay Password</label>
-                    <input type="password" id="amazon_relay_password" name="amazon_relay_password" class="form-control" placeholder="Enter your Amazon Relay password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Save Amazon Relay Credentials</button>
-            </form>
-        </div>
-
-        {% if current_user.stripe_enabled %}
-            <div class="card mt-4">
-                <div class="card-header text-white bg-primary"><strong>Purchase Plans</strong></div>
-                <div class="card-body">
-                    <ul class="list-group list-group-flush">
-                        <li class="list-group-item">
-                            <form action="{{ url_for('pay_subscription', user_id=current_user.id) }}" method="post">
-                                <button type="submit" class="btn btn-success w-100">Buy A Plan (${{ "%.2f"|format(monthly_fee) }})</button>
-                            </form>
-                        </li>
-                        <li class="list-group-item">
-                            <form action="{{ url_for('pay_sms_notification', user_id=current_user.id) }}" method="post">
-                                <button type="submit" class="btn btn-info w-100">Buy SMS Notification (${{ "%.2f"|format(sms_fee) }})</button>
-                            </form>
-                        </li>
-                        <li class="list-group-item">
-                            <form action="{{ url_for('pay_extra_login', user_id=current_user.id) }}" method="post">
-                                <button type="submit" class="btn btn-warning w-100">Buy Extra Login (${{ "%.2f"|format(extra_login_price) }})</button>
-                            </form>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        {% else %}
-            <div class="card mt-4">
-                <div class="card-header text-dark bg-warning"><strong>Purchase Plans</strong></div>
-                <div class="card-body">
-                    <p class="card-text text-danger">Purchase Plans are not enabled for this account. Please contact Admin.</p>
-                </div>
-            </div>
-        {% endif %}
-
-        <a href="{{ url_for('logout') }}" class="btn btn-danger mt-4">Logout</a>
+    <!-- Tab Content -->
+    <div class="tab-content mt-3">
+        <!-- IN TRANSIT Tab -->
+        <div id="inTransit" class="tab-pane fade show active">
+            <div class="filter-container">
+        <h3>Search & Filter</h3>
+        <form id="searchForm" method="GET" action="{{ url_for('relay_data') }}">
+            <input type="text" name="contract_id" placeholder="Search by Contract ID">
+            <input type="text" name="load_id" placeholder="Search by Load ID">
+            <input type="text" name="driver_name" placeholder="Driver Name">
+            <select name="alert_type">
+                <option value="">Select Alert Type</option>
+                <option value="sms">SMS</option>
+                <option value="email">Email</option>
+                <option value="push">Push Notification</option>
+            </select>
+            <button type="submit" class="search-btn">Search</button>
+        </form>
     </div>
 
-    <script>
-        function sendVerificationEmail() {
-            fetch("{{ url_for('send_verification_email') }}", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" }
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById("verification-message").innerText = data.message;
-            });
-        }
-    </script>
-    <script>
-        function sendVerificationOTP() {
-            fetch("{{ url_for('send_otp') }}", {
-                method: "POST"
-            })
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById("verification-otp").innerText = "OTP sent successfully! Check your phone.";
-            })
-            .catch(error => {
-                document.getElementById("verification-otp").innerText = "Failed to send OTP.";
-            });
-        }
+    <!-- DATA TABLE -->
+    <table class="table-responsive">
+        <thead>
+            <tr>
+                <th>Contract ID</th>
+                <th>Load ID</th>
+                <th>From-To</th>
+                <th>Driver Name</th>
+                <th>Load Type</th>
+                <th>Create Time</th>
+                <th>Status</th>
+                <th>Arrival/Departure Time</th>
+                <th>Tab Name</th>
+                <th>Alert</th>
+            </tr>
+        </thead>
+        {% if relay_data %}
+        <tbody>
+            {% for item in relay_data %}
+            <tr class="
+                {% if item.status == 'Late' %}late
+                {% elif item.status == 'On-Time' %}on-time
+                {% elif item.loadType == 'bobtail' %}bobtail
+                {% endif %}">
+                <td>{{ item.contract_id }}</td>
+                <td>{{ item.load_id }}</td>
+                <td>{{ item.from_to }}</td>
+                <td>{{ item.driver_name }}</td>
+                <td>{{ item.loadType }}</td>
+                <td>{{ item.createTime }}</td>
+                <td>{{ item.status }}</td>
+                <td>{{ item.arrival_departure_time }}</td>
+                <td>{{ item.tabname }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('send_alert') }}">
+                        <input type="hidden" name="load_id" value="{{ item.load_id }}">
+                        <select name="alert_type">
+                            <option value="sms">SMS</option>
+                            <option value="email">Email</option>
+                            <option value="push">Push</option>
+                        </select>
+                        <button type="submit">Send Alert</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        {% else %}
+        <tbody>
+            <tr><td colspan="10" class="text-center text-white">No data available</td></tr>
+        </tbody>
+        {% endif %}
+    </table>
+        </div>
 
-        function verifyOTP() {
-            const otpValue = document.getElementById("otp").value;
-            fetch("{{ url_for('verify_otp') }}", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: "otp=" + encodeURIComponent(otpValue)
-            })
-            .then(response => response.text())
-            .then(data => {
-                location.reload();
-            })
-            .catch(error => {
-                alert("OTP verification failed");
-            });
-        }
-    </script>
+        <!-- UPCOMING Tab -->
+        <div id="upcoming" class="tab-pane fade">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Contract</th>
+                            <th>Payout Value</th>
+                            <th>Load ID</th>
+                            <th>From To</th>
+                            <th>Driver Name</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6" class="text-center">No data available</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- HISTORY Tab -->
+        <div id="history" class="tab-pane fade">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Contract</th>
+                            <th>Payout Value</th>
+                            <th>Load ID</th>
+                            <th>From To</th>
+                            <th>Driver Name</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6" class="text-center">No data available</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
