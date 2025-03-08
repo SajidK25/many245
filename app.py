@@ -533,7 +533,7 @@ def login():
         session['login_token'] = new_token
         login_user(user)
         log_action(user.id, "User logged in")
-        return redirect(url_for('user_dashboard'))
+        return redirect(url_for('relay_data'))
 
 @app.route("/admin/update_login_price", methods=["POST"])
 @login_required
