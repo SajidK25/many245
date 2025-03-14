@@ -5,12 +5,12 @@
 {% block content %}
     <style>
         body {
-            background-color: #1e1e1e;
+            background-color: #f8f9fa;
             color: black;
             font-family: Arial, sans-serif;
         }
         h3 {
-            color: white;
+            color: black;
         }
         .filter-container { margin-bottom: 20px; background-color: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .filter-container input, .filter-container select { padding: 10px; margin: 5px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; }
@@ -24,16 +24,22 @@
         .late { background-color: #f8d7da; color: #721c24; } /* Red */
         .on-time { background-color: #d4edda; color: #155724; } /* Green */
         .bobtail { background-color: #fff3cd; color: #856404; } /* Orange */
+
         .nav-tabs .nav-link {
             color: #00aaff;
         }
         .nav-tabs .nav-link.active {
             background-color: transparent;
             border-bottom: 2px solid #00aaff;
-            color: white;
+            color:  #00aaff;
         }
         .table {
-            color: white;
+            color: black;
+        }
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
     </style>
 
@@ -57,36 +63,49 @@
         <div class="tab-content mt-3">
             <!-- IN TRANSIT Tab -->
             <div id="inTransit" class="tab-pane fade show active">
-                <div class="filter-container">
-                    <h3>Search & Filter</h3>
-                    <form id="searchForm" method="GET" action="{{ url_for('relay_data') }}">
-                        <input type="text" name="contract_id" placeholder="Search by Contract ID">
-                        <input type="text" name="load_id" placeholder="Search by Load ID">
-                        <input type="text" name="driver_name" placeholder="Driver Name">
-                        <select name="alert_type">
-                            <option value="">Select Alert Type</option>
-                            <option value="sms">SMS</option>
-                            <option value="email">Email</option>
-                            <option value="push">Push Notification</option>
+                <div class="mt-3 p-3 bg-white border rounded">
+                    <div class="search-bar">
+                        <input type="text" class="form-control" placeholder="Search by IDs, location, drivers">
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Domiciles</option>
+                            <option Delayed>EWR7, Avenel, NJ</option>
                         </select>
-                        <button type="submit" class="search-btn">Search</button>
-                    </form>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Disruptions</option>
+                            <option value="">Delayed</option>
+                            <option value="">Delay Reported</option>
+                        </select>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Work types</option>
+                            <option value="">Round trip</option>
+                            <option value="">One way</option>
+                        </select>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Programs</option>
+                            <option value="">Contracts</option>
+
+                        </select>
+                    </div>
                 </div>
 
                 <!-- DATA TABLE -->
                 <table class="table-responsive">
                     <thead>
                         <tr>
-                            <th>Contract ID</th>
                             <th>Load ID</th>
                             <th>From-To</th>
                             <th>Driver Name</th>
-                            <th>Load Type</th>
-                            <th>Create Time</th>
+                            <th>Contract ID</th>
                             <th>Status</th>
+                            <th>Planned Arrival Stop 1</th>
+                            <th>Planned Departure Stop 1</th>
+                            <th>Actual Departure Stop 1</th>
+                            <th>Planned Arrival Stop 2</th>
+                            <th>Actual Arrival Stop 2</th>
+                            <th>Planned Departure Stop 2</th>
+                            <th>Actual Departure Stop 2</th>
+                            <th>Actual status</th>
                             <th>Arrival/Departure Time</th>
-                            <th>Tab Name</th>
-                            <th>Alert</th>
                         </tr>
                     </thead>
                     {% if relay_data %}
@@ -105,6 +124,11 @@
                             <td>{{ item.createTime }}</td>
                             <td>{{ item.status }}</td>
                             <td>{{ item.arrival_departure_time }}</td>
+                            <td>{{ item.arrival_departure_time }}</td>
+                            <td>{{ item.arrival_departure_time }}</td>
+                            <td>{{ item.arrival_departure_time }}</td>
+                            <td>{{ item.arrival_departure_time }}</td>
+                            <td>{{ item.arrival_departure_time }}</td>
                             <td>{{ item.tabname }}</td>
                             <td>
                                 <form method="POST" action="{{ url_for('send_alert') }}">
@@ -122,7 +146,7 @@
                     </tbody>
                     {% else %}
                     <tbody>
-                        <tr><td colspan="10" class="text-center text-white">No data available</td></tr>
+                        <tr><td colspan="14" class="text-center .text-black-50">No data available</td></tr>
                     </tbody>
                     {% endif %}
                 </table>
@@ -130,20 +154,29 @@
 
             <!-- UPCOMING Tab -->
             <div id="upcoming" class="tab-pane fade">
-                <div class="filter-container">
-                    <h3>Search & Filter</h3>
-                    <form id="searchForm" method="GET" action="{{ url_for('relay_data') }}">
-                        <input type="text" name="contract_id" placeholder="Search by Contract ID">
-                        <input type="text" name="load_id" placeholder="Search by Load ID">
-                        <input type="text" name="driver_name" placeholder="Driver Name">
-                        <select name="alert_type">
-                            <option value="">Select Alert Type</option>
-                            <option value="sms">SMS</option>
-                            <option value="email">Email</option>
-                            <option value="push">Push Notification</option>
+                <div class="mt-3 p-3 bg-white border rounded">
+                    <div class="search-bar">
+                        <input type="text" class="form-control" placeholder="Search by IDs, location, drivers">
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Domiciles</option>
+                            <option Delayed>EWR7, Avenel, NJ</option>
                         </select>
-                        <button type="submit" class="search-btn">Search</button>
-                    </form>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Disruptions</option>
+                            <option value="">Delayed</option>
+                            <option value="">Delay Reported</option>
+                        </select>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Work types</option>
+                            <option value="">Round trip</option>
+                            <option value="">One way</option>
+                        </select>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Programs</option>
+                            <option value="">Contracts</option>
+
+                        </select>
+                    </div>
                 </div>
 
                 <!-- DATA TABLE -->
@@ -195,7 +228,7 @@
                     </tbody>
                     {% else %}
                     <tbody>
-                        <tr><td colspan="10" class="text-center text-white">No data available</td></tr>
+                        <tr><td colspan="10" class="text-center .text-black-50">No data available</td></tr>
                     </tbody>
                     {% endif %}
                 </table>
@@ -203,20 +236,22 @@
 
             <!-- HISTORY Tab -->
             <div id="history" class="tab-pane fade">
-                <div class="filter-container">
-                    <h3>Search & Filter</h3>
-                    <form id="searchForm" method="GET" action="{{ url_for('relay_data') }}">
-                        <input type="text" name="contract_id" placeholder="Search by Contract ID">
-                        <input type="text" name="load_id" placeholder="Search by Load ID">
-                        <input type="text" name="driver_name" placeholder="Driver Name">
-                        <select name="alert_type">
-                            <option value="">Select Alert Type</option>
-                            <option value="sms">SMS</option>
-                            <option value="email">Email</option>
-                            <option value="push">Push Notification</option>
+                <div class="mt-3 p-3 bg-white border rounded">
+                    <div class="search-bar">
+                        <input type="text" class="form-control" placeholder="Search by IDs, location, drivers">
+                        <button class="btn btn-outline-secondary" onclick="changeDateRange(-7)">&lt;</button>
+                        <input type="text" class="form-control text-center" id="dateRange" readonly>
+                        <button class="btn btn-outline-secondary" onclick="changeDateRange(7)">&gt;</button>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Domiciles</option>
+                            <option Delayed>EWR7, Avenel, NJ</option>
                         </select>
-                        <button type="submit" class="search-btn">Search</button>
-                    </form>
+                        <select class="form-select">
+                            <option value="" disabled selected hidden>Disruptions</option>
+                            <option value="">Delayed</option>
+                            <option value="">Delay Reported</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- DATA TABLE -->
@@ -268,11 +303,31 @@
                     </tbody>
                     {% else %}
                     <tbody>
-                        <tr><td colspan="10" class="text-center text-white">No data available</td></tr>
+                        <tr><td colspan="10" class="text-center .text-black-50">No data available</td></tr>
                     </tbody>
                     {% endif %}
                 </table>
             </div>
         </div>
     </div>
+    <script>
+    let startDate = new Date("2025-03-02"); // Initial start date
+
+    function updateDateRange() {
+        let endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 6); // Set end date 6 days after start
+
+        let options = { month: 'short', day: 'numeric' };
+        document.getElementById("dateRange").value = 
+            `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+    }
+
+    function changeDateRange(days) {
+        startDate.setDate(startDate.getDate() + days); // Move start date by given days
+        updateDateRange();
+    }
+
+    // Initialize date range on page load
+    updateDateRange();
+</script>
 {% endblock %}
