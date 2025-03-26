@@ -1374,9 +1374,9 @@ def send_alert():
     flash(f"{alert_type.upper()} Alert Sent for Load {load_id}", "success")
     return redirect(url_for('relay_data'))
 
-def send_sms(message):
-    # Example: Integrate with Twilio or VoIP.ms
-    print("Sending SMS:", message)
+# def send_sms(message):
+#     # Example: Integrate with Twilio or VoIP.ms
+#     print("Sending SMS:", message)
 
 def send_email(subject, body):
     # Example: Use Flask-Mail or SMTP here
