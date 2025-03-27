@@ -533,7 +533,7 @@ def login():
         session['login_token'] = new_token
         login_user(user)
         log_action(user.id, "User logged in")
-        return redirect(url_for('relay_data'))
+        return redirect(url_for('user_dashboard'))
 
 @app.route("/admin/update_login_price", methods=["POST"])
 @login_required
@@ -698,14 +698,21 @@ def update_timezone():
 @app.route('/user_dashboard')
 @login_required
 def user_dashboard():
-    if current_user.role != 'user':
-        flash('Unauthorized access!', 'error')
-        return redirect(url_for('login'))
-    if not current_user.is_paid:
-        flash('Access restricted. Please contact the admin to make a payment.', 'error')
-        return redirect(url_for('login'))
-    now = datetime.utcnow().date()
-    return render_template('user_dashboard.html',pytz=pytz,users=current_user,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
+    search_filters = {
+            'contract_id': request.args.get('contract_id'),
+            'load_id': request.args.get('load_id'),
+            'driver_name': request.args.get('driver_name'),
+        }
+
+    query = RelayData.query
+
+    for field, value in search_filters.items():
+        if value:
+            query = query.filter(getattr(RelayData, field).ilike(f"%{value}%"))
+
+    filtered_data = query.all()
+
+    return render_template("user_dashboard.html", relay_data=filtered_data)
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required

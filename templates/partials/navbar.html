@@ -20,7 +20,7 @@
                         </li>
                     {% elif current_user.role=='user' %}
                         <li class="nav-item">
-                            <a class="nav-link text-white fw-bold link-secondary {% if request.path == url_for('relay_data') %}active{% endif %}" href="{{ url_for('relay_data') }}">Relay Data</a>
+                            <a class="nav-link text-white fw-bold link-secondary {% if request.path == url_for('user_dashboard') %}active{% endif %}" href="{{ url_for('user_dashboard') }}">Dashboard</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white fw-bold link-secondary {% if request.path == url_for('user_settings') %}active{% endif %}" href="{{ url_for('user_settings') }}">Settings</a>
