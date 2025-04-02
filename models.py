@@ -15,12 +15,18 @@ def load_user(user_id):
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False, name="uq_user_username")  # Named unique constraint
-    email = db.Column(db.String(120), unique=True, nullable=False, name="uq_user_email")  # Named unique constraint
-    phone_number = db.Column(db.String(15), unique=True, nullable=True, name="uq_user_phone_number")  # Named unique constraint
+    username = db.Column(db.String(20), unique=True, nullable=False, name="uq_user_username")
+    email = db.Column(db.String(120), unique=True, nullable=False, name="uq_user_email")
+    phone_number = db.Column(db.String(15), unique=True, nullable=True, name="uq_user_phone_number")
+    
+    # Global notification settings
     notifications = db.Column(db.Boolean, default=False)
+    email_enabled = db.Column(db.Boolean, default=False)  # Global email opt-in
+    push_enabled = db.Column(db.Boolean, default=False)   # Global push opt-in
+    sms_opt_in = db.Column(db.Boolean, default=False)     # Global SMS opt-in
+
     password = db.Column(db.String(60), nullable=False)
-    max_logins = db.Column(db.Integer, default=1)  # Default to 1 active login
+    max_logins = db.Column(db.Integer, default=1)
     active_tokens = db.relationship('LoginToken', backref='user', lazy=True)
     active_sessions = db.relationship('LoginSession', backref='user', lazy=True)
     role = db.Column(db.String(10), nullable=False, default='user')
@@ -28,33 +34,29 @@ class User(db.Model, UserMixin):
     payment_status = db.Column(db.String(20), default="Unpaid")
     payment_due_date = db.Column(db.Date, nullable=True)
     stripe_enabled = db.Column(db.Boolean, default=False)
-    email_enabled = db.Column(db.Boolean, default=False)
-    push_enabled = db.Column(db.Boolean, default=False)
+
     email_verified = db.Column(db.Boolean, default=False)
     verification_token = db.Column(db.String(100), nullable=True)
     phone_verified = db.Column(db.Boolean, default=False)
     phone_verification_token = db.Column(db.String(100), nullable=True)
-    amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")  # Named unique constraint
+
+    amazon_relay_email = db.Column(db.String(120), unique=True, nullable=True, name="uq_user_amazon_relay_email")
     amazon_relay_password = db.Column(db.String(60), nullable=True)
-    sms_opt_in = db.Column(db.Boolean, default=False)  # Track if SMS alerts are enabled
-    sms_fee_due = db.Column(db.Float, default=0.0)  # Track the prorated amount
-    timezone = db.Column(db.String(50), default="UTC")  # Track the user's timezone
+    
+    sms_fee_due = db.Column(db.Float, default=0.0)
+    timezone = db.Column(db.String(50), default="UTC")
+
+    # Password Management
     def set_password(self, password):
         self.password = bcrypt.generate_password_hash(password).decode('utf-8')
 
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password, password)
 
-    def set_amazon_relay_password(self, password):
-        self.amazon_relay_password = bcrypt.generate_password_hash(password).decode('utf-8')
-
-    def check_amazon_relay_password(self, password):
-        return bcrypt.check_password_hash(self.amazon_relay_password, password)
-    # Generate a password reset token
     def get_reset_token(self, expires_sec=1800):
         s = Serializer(current_app.config['SECRET_KEY'])
         return s.dumps({'email': self.email})
-    # Verify the reset token
+
     @staticmethod
     def verify_reset_token(token):
         s = Serializer(current_app.config['SECRET_KEY'])
@@ -62,9 +64,33 @@ class User(db.Model, UserMixin):
             email = s.loads(token, max_age=1800)['email']
         except:
             return None
-        # return User.query.get(email)
         return email
 
+class UserNotification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete="CASCADE"), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+
+    sms_enabled = db.Column(db.Boolean, default=True)
+    email_enabled = db.Column(db.Boolean, default=True)
+    push_enabled = db.Column(db.Boolean, default=True)
+
+    user = db.relationship('User', backref=db.backref('notifications_settings', lazy=True, cascade="all, delete"))
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "category IN ('Driver Late', 'Bob Tail', 'Ready to Pickup', 'Green Notification')",
+            name="check_category_valid"
+        ),
+    )
+
+    def to_dict(self):
+        return {
+            "category": self.category,
+            "sms_enabled": self.sms_enabled,
+            "email_enabled": self.email_enabled,
+            "push_enabled": self.push_enabled
+        }
 
 class LoginToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)

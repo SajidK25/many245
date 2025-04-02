@@ -7,7 +7,7 @@ from flask_migrate import Migrate
 from datetime import datetime, timedelta
 from itsdangerous import URLSafeTimedSerializer as Serializer, SignatureExpired, BadTimeSignature,BadSignature
 from flask_mail import Mail, Message
-from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config,HistoryLog,APIKey,RelayData
+from models import db, User, LoginSession, Payment, SMTPSettings, VoipSettings, Config,HistoryLog,APIKey,RelayData,UserNotification
 from api import api_bp
 from utils import log_action
 import os
@@ -713,6 +713,103 @@ def user_dashboard():
     filtered_data = query.all()
 
     return render_template("user_dashboard.html", relay_data=filtered_data)
+
+@app.route('/get_notification_settings')
+@login_required
+def get_notification_settings():
+    print(f"Current User ID: {current_user.id}")  # Debugging
+    settings = UserNotification.query.filter_by(user_id=current_user.id).all()
+    print(f"User Settings Found: {settings}")  # Debugging
+    return jsonify([setting.to_dict() for setting in settings])
+
+@app.route('/update_notification_setting', methods=['POST'])
+@login_required
+def update_notification_setting():
+    user_id = current_user.id  # Get the logged-in user ID
+    data = request.get_json()
+
+    category = data.get("category")
+    notification_type = data.get("notification_type")
+    enabled = data.get("enabled")
+
+    # Check if the setting exists for this user
+    setting = UserNotification.query.filter_by(user_id=user_id, category=category).first()
+
+    # If not found, create a new record for this category
+    if not setting:
+        setting = UserNotification(
+            user_id=user_id,
+            category=category,
+            sms_enabled=False,
+            email_enabled=False,
+            push_enabled=False
+        )
+        db.session.add(setting)
+        db.session.commit()  # Commit here to ensure the new setting is saved
+
+    # Update the specific notification type
+    if notification_type == "sms":
+        setting.sms_enabled = enabled
+    elif notification_type == "email":
+        setting.email_enabled = enabled
+    elif notification_type == "push":
+        setting.push_enabled = enabled
+
+    db.session.commit()
+    return jsonify({"success": True, "message": f"{notification_type} updated for {category}."})
+
+
+# @app.route('/user/notifications/<int:user_id>', methods=['GET'])
+# def get_notifications(user_id):
+#     user = User.query.get(user_id)
+#     if not user:
+#         return jsonify({"error": "User not found"}), 404
+
+#     global_settings = {
+#         "email_enabled": user.email_enabled,
+#         "push_enabled": user.push_enabled,
+#         "sms_opt_in": user.sms_opt_in
+#     }
+    
+#     category_settings = [n.to_dict() for n in user.notifications_settings]
+
+#     return jsonify({"global_settings": global_settings, "category_settings": category_settings})
+
+# @app.route('/user/notifications/global', methods=['POST'])
+# def update_global_notifications():
+#     data = request.json
+#     user = User.query.get(data['user_id'])
+    
+#     if not user:
+#         return jsonify({"error": "User not found"}), 404
+
+#     user.email_enabled = data.get("email_enabled", user.email_enabled)
+#     user.push_enabled = data.get("push_enabled", user.push_enabled)
+#     user.sms_opt_in = data.get("sms_opt_in", user.sms_opt_in)
+
+#     db.session.commit()
+#     return jsonify({"message": "Global notification settings updated"})
+
+@app.route('/user/notifications/category', methods=['POST'])
+def update_category_notifications():
+    data = request.json
+    user = User.query.get(data['user_id'])
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    notification = UserNotification.query.filter_by(user_id=data['user_id'], category=data['category']).first()
+    
+    if not notification:
+        return jsonify({"error": "Notification category not found"}), 404
+
+    notification.sms_enabled = data.get("sms_enabled", notification.sms_enabled)
+    notification.email_enabled = data.get("email_enabled", notification.email_enabled)
+    notification.push_enabled = data.get("push_enabled", notification.push_enabled)
+
+    db.session.commit()
+    return jsonify({"message": "Category notification settings updated"})
+
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required

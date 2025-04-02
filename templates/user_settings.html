@@ -22,6 +22,13 @@
             {% endwith %}
         </div>
         <div class="container mt-4">
+            <div class="card p-4">
+                <h2 class="mb-3">Notification Settings</h2>
+                <div id="notification-settings">
+                    <!-- Checkboxes will be dynamically populated here -->
+                </div>
+            </div>
+
             <div class="card p-4 mt-4">
                 <h2 class="mb-3">Timezone Settings</h2>
                 <form action="{{ url_for('update_timezone') }}" method="post">
@@ -121,6 +128,85 @@
 
         </div>
     </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            loadSettings();
+
+            // Attach event listener to the notification settings container
+            document.getElementById("notification-settings").addEventListener("change", function (event) {
+                if (event.target.type === "checkbox") {
+                    updateSetting(event.target);
+                }
+            });
+        });
+
+        function loadSettings() {
+            fetch("/get_notification_settings")
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById("notification-settings");
+                    container.innerHTML = "";  // Clear previous content
+                    
+                    const categories = ["Driver Late", "Bob Tail", "Ready to Pickup", "Green Notification"];
+                    
+                    categories.forEach(category => {
+                        let setting = data.find(item => item.category === category) || {
+                            category,
+                            sms_enabled: false,
+                            email_enabled: false,
+                            push_enabled: false
+                        };
+
+                        let settingDiv = document.createElement("div");
+                        settingDiv.classList.add("notification-category");
+                        settingDiv.innerHTML = `
+                            <h4>${setting.category}</h4>
+                            <label>
+                                <input type="checkbox" data-category="${setting.category}" data-type="sms" ${setting.sms_enabled ? "checked" : ""}>
+                                SMS
+                            </label>
+                            <label>
+                                <input type="checkbox" data-category="${setting.category}" data-type="email" ${setting.email_enabled ? "checked" : ""}>
+                                Email
+                            </label>
+                            <label>
+                                <input type="checkbox" data-category="${setting.category}" data-type="push" ${setting.push_enabled ? "checked" : ""}>
+                                Push
+                            </label>
+                        `;
+
+                        container.appendChild(settingDiv);
+                    });
+                })
+                .catch(error => console.error("Error loading notification settings:", error));
+        }
+
+        function updateSetting(checkbox) {
+            const category = checkbox.dataset.category;
+            const notificationType = checkbox.dataset.type;
+            const isEnabled = checkbox.checked;
+
+            fetch("/update_notification_setting", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    category: category,
+                    notification_type: notificationType,
+                    enabled: isEnabled
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Update Response:", data);
+            })
+            .catch(error => console.error("Error updating notification setting:", error));
+        }
+
+
+    </script>
     <script>
         function sendVerificationEmail() {
             fetch("{{ url_for('send_verification_email') }}", {
