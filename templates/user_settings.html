@@ -153,8 +153,20 @@
                     const container = document.getElementById("notification-settings");
                     container.innerHTML = "";  // Clear previous content
                     
-                    const categories = ["Driver Late", "Bob Tail", "Ready to Pickup", "Green Notification"];
-        
+                    const categories = [
+                    "Driver Late",
+                    "Bob Tail",
+                    "Ready to Pickup",
+                    "Pink Notification"
+                    ];
+
+                    const categoryColors = {
+                        "Driver Late": "#dc3545",       // Red
+                        "Bob Tail": "#0d6efd",          // Blue
+                        "Ready to Pickup": "#ffc107",   // Yellow
+                        "Pink Notification": "#d63384"  // Pink
+                    };
+
                     categories.forEach(category => {
                         let setting = data.find(item => item.category === category) || {
                             category,
@@ -168,15 +180,22 @@
 
                         let settingDiv = document.createElement("div");
                         settingDiv.classList.add("notification-category");
+                        settingDiv.style.border = "1px solid #dee2e6";
+                        settingDiv.style.padding = "1rem";
+                        settingDiv.style.marginBottom = "1rem";
+                        settingDiv.style.borderRadius = "0.5rem";
+
+                        const colorBox = `<span style="display: inline-block; width: 20px; height: 20px; background-color: ${categoryColors[category]}; border-radius: 4px; margin-right: 10px;"></span>`;
+
                         settingDiv.innerHTML = `
-                            <h4>${setting.category}</h4>
-                            <label>
+                            <h5>${colorBox} ${setting.category}</h5>
+                            <label style="margin-right: 10px;">
                                 <input type="checkbox" data-category="${setting.category}" data-type="sms"
                                     ${setting.sms_enabled ? "checked" : ""}
                                     ${smsEnabled ? "" : "disabled"}>
                                 SMS
                             </label>
-                            <label>
+                            <label style="margin-right: 10px;">
                                 <input type="checkbox" data-category="${setting.category}" data-type="email"
                                     ${setting.email_enabled ? "checked" : ""}>
                                 Email
@@ -192,8 +211,8 @@
                     });
                 })
                 .catch(error => console.error("Error loading notification settings:", error));
-
-        }
+            }
+            
         // Function to update the notification setting
         function updateSetting(checkbox) {
             const category = checkbox.dataset.category;
