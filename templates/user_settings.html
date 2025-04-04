@@ -24,6 +24,11 @@
         <div class="container mt-4">
             <div class="card p-4">
                 <h2 class="mb-3">Notification Settings</h2>
+                {% if sms_opt_in and phone_verified %}
+                    <p class="text-success">SMS notifications are enabled. You will receive SMS alerts for your selected categories.</p>
+                {% else %}
+                    <p class="text-danger">SMS notifications are disabled. Please verify your phone number to enable SMS notifications.</p>
+                {% endif %}
                 <div id="notification-settings">
                     
                     <!-- Checkboxes will be dynamically populated here -->
@@ -157,14 +162,14 @@
                     "Driver Late",
                     "Bob Tail",
                     "Ready to Pickup",
-                    "Pink Notification"
+                    "Driver on time"
                     ];
 
                     const categoryColors = {
                         "Driver Late": "#dc3545",       // Red
-                        "Bob Tail": "#0d6efd",          // Blue
-                        "Ready to Pickup": "#ffc107",   // Yellow
-                        "Pink Notification": "#d63384"  // Pink
+                        "Bob Tail": "#ffc107",          // Yellow
+                        "Ready to Pickup": "#0d6efd",   // Blue
+                        "Driver on time": "#3cb371"  // Green
                     };
 
                     categories.forEach(category => {

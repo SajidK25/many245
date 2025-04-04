@@ -85,7 +85,7 @@ class UserNotification(db.Model):
 
     __table_args__ = (
         db.CheckConstraint(
-            "category IN ('Driver Late', 'Bob Tail', 'Ready to Pickup', 'Pink Notification')",
+            "category IN ('Driver Late', 'Bob Tail', 'Ready to Pickup', 'Driver on time')",
             name="check_category_valid"
         ),
     )

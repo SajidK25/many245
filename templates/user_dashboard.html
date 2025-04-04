@@ -146,7 +146,14 @@
                     </tbody>
                     {% else %}
                     <tbody>
-                        <tr><td colspan="14" class="text-center .text-black-50">No data available</td></tr>
+                        <tr>
+                            <td colspan="14" class="text-center text-black-50">
+                                <div style="text-align: center;">
+                                    <img src="{{ url_for('static', filename='images/truck_image.png') }}" 
+                                        alt="No trip to show" style="max-width: 300px;">
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                     {% endif %}
                 </table>
@@ -228,7 +235,14 @@
                     </tbody>
                     {% else %}
                     <tbody>
-                        <tr><td colspan="10" class="text-center .text-black-50">No data available</td></tr>
+                        <tr>
+                            <td colspan="14" class="text-center text-black-50">
+                                <div style="text-align: center;">
+                                    <img src="{{ url_for('static', filename='images/truck_image.png') }}" 
+                                        alt="No trip to show" style="max-width: 300px;">
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                     {% endif %}
                 </table>
@@ -303,7 +317,14 @@
                     </tbody>
                     {% else %}
                     <tbody>
-                        <tr><td colspan="10" class="text-center .text-black-50">No data available</td></tr>
+                        <tr>
+                            <td colspan="14" class="text-center text-black-50">
+                                <div style="text-align: center;">
+                                    <img src="{{ url_for('static', filename='images/truck_image.png') }}" 
+                                        alt="No trip to show" style="max-width: 300px;">
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                     {% endif %}
                 </table>
