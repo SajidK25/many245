@@ -682,7 +682,7 @@ def admin_settings():
 def user_settings():
     now = datetime.utcnow().date()
     gmt_zones = [tz for tz in pytz.all_timezones if 'GMT' in tz]
-    return render_template('user_settings.html',timezones=gmt_zones,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price())
+    return render_template('user_settings.html',timezones=gmt_zones,now=now,monthly_fee=get_monthly_fee(),extra_login_price=get_extra_login_price(),sms_fee=get_sms_price(),sms_opt_in=current_user.sms_opt_in, phone_verified=current_user.phone_verified )
 
 @app.route('/update_timezone', methods=['POST'])
 @login_required
@@ -1429,10 +1429,10 @@ def update_monthly_fee():
 def update_amazon_relay():
     amazon_relay_email = request.form.get('amazon_relay_email')
     amazon_relay_password = request.form.get('amazon_relay_password')
-    
+    user = User.query.get_or_404(current_user.id)
     if amazon_relay_email and amazon_relay_password:
-        current_user.amazon_relay_email = amazon_relay_email
-        current_user.set_amazon_relay_password(amazon_relay_password)  # Encrypt password
+        user.amazon_relay_email = amazon_relay_email
+        user.set_amazon_relay_password(amazon_relay_password)  # Encrypt password
         db.session.commit()
         log_action(current_user.id, "Updated Amazon Relay credentials")
         flash('Amazon Relay credentials updated successfully.', 'success')

@@ -25,6 +25,7 @@
             <div class="card p-4">
                 <h2 class="mb-3">Notification Settings</h2>
                 <div id="notification-settings">
+                    
                     <!-- Checkboxes will be dynamically populated here -->
                 </div>
             </div>
@@ -129,6 +130,10 @@
         </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script> 
+        const smsOptIn = {{ sms_opt_in | tojson }}; 
+        const phoneVerified = {{ phone_verified | tojson }}; 
+    </script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             loadSettings();
@@ -140,7 +145,7 @@
                 }
             });
         });
-
+        
         function loadSettings() {
             fetch("/get_notification_settings")
                 .then(response => response.json())
@@ -149,7 +154,7 @@
                     container.innerHTML = "";  // Clear previous content
                     
                     const categories = ["Driver Late", "Bob Tail", "Ready to Pickup", "Green Notification"];
-                    
+        
                     categories.forEach(category => {
                         let setting = data.find(item => item.category === category) || {
                             category,
@@ -158,20 +163,27 @@
                             push_enabled: false
                         };
 
+                        // Determine if SMS should be enabled
+                        const smsEnabled = (smsOptIn && phoneVerified);
+
                         let settingDiv = document.createElement("div");
                         settingDiv.classList.add("notification-category");
                         settingDiv.innerHTML = `
                             <h4>${setting.category}</h4>
                             <label>
-                                <input type="checkbox" data-category="${setting.category}" data-type="sms" ${setting.sms_enabled ? "checked" : ""}>
+                                <input type="checkbox" data-category="${setting.category}" data-type="sms"
+                                    ${setting.sms_enabled ? "checked" : ""}
+                                    ${smsEnabled ? "" : "disabled"}>
                                 SMS
                             </label>
                             <label>
-                                <input type="checkbox" data-category="${setting.category}" data-type="email" ${setting.email_enabled ? "checked" : ""}>
+                                <input type="checkbox" data-category="${setting.category}" data-type="email"
+                                    ${setting.email_enabled ? "checked" : ""}>
                                 Email
                             </label>
                             <label>
-                                <input type="checkbox" data-category="${setting.category}" data-type="push" ${setting.push_enabled ? "checked" : ""}>
+                                <input type="checkbox" data-category="${setting.category}" data-type="push"
+                                    ${setting.push_enabled ? "checked" : ""}>
                                 Push
                             </label>
                         `;
@@ -180,8 +192,9 @@
                     });
                 })
                 .catch(error => console.error("Error loading notification settings:", error));
-        }
 
+        }
+        // Function to update the notification setting
         function updateSetting(checkbox) {
             const category = checkbox.dataset.category;
             const notificationType = checkbox.dataset.type;
@@ -204,8 +217,6 @@
             })
             .catch(error => console.error("Error updating notification setting:", error));
         }
-
-
     </script>
     <script>
         function sendVerificationEmail() {

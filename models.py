@@ -56,7 +56,13 @@ class User(db.Model, UserMixin):
     def get_reset_token(self, expires_sec=1800):
         s = Serializer(current_app.config['SECRET_KEY'])
         return s.dumps({'email': self.email})
+    
+    def set_amazon_relay_password(self, password):
+        self.amazon_relay_password = bcrypt.generate_password_hash(password).decode('utf-8')
 
+    def check_amazon_relay_password(self, password):
+        return bcrypt.check_password_hash(self.amazon_relay_password, password)
+    
     @staticmethod
     def verify_reset_token(token):
         s = Serializer(current_app.config['SECRET_KEY'])
