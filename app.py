@@ -846,7 +846,7 @@ def scrape_amazon_relay():
 
     # Build docker run command with override
     docker_command = [
-        "docker", "run", "--rm",
+        "docker", "run", "-d",
         "-v", f"{output_path}:/tmp/user_profile",
         "-e", f"RELAYUSERNAME={user.amazon_relay_email}",
         "-e", f"RELAYPASSWORD={user.amazon_relay_password}",
