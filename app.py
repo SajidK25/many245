@@ -850,7 +850,7 @@ def scrape_amazon_relay():
         "-v", f"{output_path}:/tmp/user_profile",
         "-e", f"RELAYUSERNAME={user.amazon_relay_email}",
         "-e", f"RELAYPASSWORD={user.amazon_relay_password}",
-        "mg_docker_relay_pull"
+        "mg_docker_relay_pull:latest"
     ]
 
     try:
