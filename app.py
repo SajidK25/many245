@@ -843,11 +843,13 @@ def scrape_amazon_relay():
 
     output_path = os.path.join(os.getcwd(), "data")
     os.makedirs(output_path, exist_ok=True)
-
+    # Define output DB file per user
+    user_db_file = os.path.join(output_path, f"{user.id}.db")
     # Build docker run command with override
     docker_command = [
         "docker", "run", "-d",
         "-v", f"{output_path}:/tmp/user_profile",
+        "-v", f"/var/run/docker.sock:/var/run/docker.sock",
         "-e", f"RELAYUSERNAME={user.amazon_relay_email}",
         "-e", f"RELAYPASSWORD={user.amazon_relay_password}",
         "mg_docker_relay_pull:latest"
