@@ -18,6 +18,7 @@ import random
 import pytz 
 # from werkzeug.security import generate_password_hash
 import smtplib
+import subprocess
 
 app = Flask(__name__)
 # app.config.from_object("config.Config")
@@ -704,13 +705,17 @@ def user_dashboard():
             'driver_name': request.args.get('driver_name'),
         }
 
-    query = RelayData.query
+    # Step 1: Load the user's relay data from SQLite
+    raw_data = read_scraped_data(current_user.id)
 
-    for field, value in search_filters.items():
-        if value:
-            query = query.filter(getattr(RelayData, field).ilike(f"%{value}%"))
+    # Step 2: Apply filtering in Python
+    def match(row):
+        return all(
+            not value or (str(row.get(field, '')).lower().find(value) >= 0)
+            for field, value in search_filters.items()
+        )
 
-    filtered_data = query.all()
+    filtered_data = list(filter(match, raw_data))
 
     return render_template("user_dashboard.html", relay_data=filtered_data)
 
@@ -810,6 +815,54 @@ def update_category_notifications():
     db.session.commit()
     return jsonify({"message": "Category notification settings updated"})
 
+import sqlite3
+def read_scraped_data(user_id): 
+    db_path = f"./data/{user_id}.db" 
+    if not os.path.exists(db_path): 
+        return []
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM loads ORDER BY id DESC LIMIT 50")
+        rows = cursor.fetchall()
+        return rows
+    except Exception as e:
+        print("Error reading SQLite:", e)
+        return []
+    finally:
+        conn.close()
+    
+@app.route("/scrape_amazon_relay", methods=["POST"]) 
+@login_required 
+def scrape_amazon_relay(): 
+    user = current_user
+    if not user.amazon_relay_email or not user.amazon_relay_password:
+        flash("Please update your Amazon Relay credentials first.", "warning")
+        return redirect(url_for("user_dashboard"))
+
+    output_path = os.path.join(os.getcwd(), "data")
+    os.makedirs(output_path, exist_ok=True)
+
+    # Build docker run command with override
+    docker_command = [
+        "docker", "run", "--rm",
+        "-v", f"{output_path}:/tmp/user_profile",
+        "-e", f"RELAYUSERNAME={user.amazon_relay_email}",
+        "-e", f"RELAYPASSWORD={user.amazon_relay_password}",
+        "mg_amazon_relay_app"
+    ]
+
+    try:
+        result = subprocess.run(docker_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
+        if result.returncode == 0:
+            flash("Scrape completed successfully.", "success")
+        else:
+            flash(f"Scraper error:\n{result.stderr.decode()}", "danger")
+    except Exception as e:
+        flash(f"Error launching scraper: {e}", "danger")
+
+    return redirect(url_for("user_dashboard"))
 
 @app.route('/admin/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
