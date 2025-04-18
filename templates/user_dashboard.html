@@ -45,7 +45,9 @@
 
     <div class="container mt-4">
         <h3>Amazon Relay Data Viewer</h3>
-        
+        <form action="{{ url_for('scrape_amazon_relay') }}" method="post" class="mb-3"> 
+            <button type="submit" class="btn btn-primary"> 🔄 Scrape Now </button> 
+        </form>
         <!-- Tabs -->
         <ul class="nav nav-tabs" id="relayTabs">
             <li class="nav-item">
